@@ -32,6 +32,8 @@ Mechanism: The system minimizes Algorithmic Depth (Kolmogorov Complexity) throug
 
 Result: Definitive states are rendered only when informational queries demand causal consistency, providing a resource-theoretic basis for state reduction.
 
+[formalism](https://github.com/Alexey-Lukin/research/blob/main/formalism.md)
+
 🛠 Simulation: CCA Research Terminal (v2.6)
 
 The primary simulation tool is included in this repository as research.html.
