@@ -32,17 +32,19 @@ Mechanism: The system minimizes Algorithmic Depth (Kolmogorov Complexity) throug
 
 Result: Definitive states are rendered only when informational queries demand causal consistency, providing a resource-theoretic basis for state reduction.
 
-🛠 Simulation: CCA Research Terminal (v2.5)
+🛠 Simulation: CCA Research Terminal (v2.6)
 
 The primary simulation tool is included in this repository as research.html.
 
 Features:
 
-Phase Space Analysis: Real-time visualization of the transition between Localization (MBL) and Thermalization phases.
+Stability Phase Space: Real-time visualization of the transition between Localization (MBL) and Thermalization phases.
 
 Spectral Telemetry: Live monitoring of $P(k)$ power spectra and spectral entropy ($S$).
 
 DTC Order Monitoring: Tracking the stability of the Discrete Time Crystal order parameter.
+
+Resource Usage: Monitoring "Algorithmic Action" during Lazy Evaluation rendering.
 
 Interactive Parameters:
 
@@ -56,15 +58,15 @@ Download research.html.
 
 Open the file in any modern web browser (Chrome/Edge recommended for WebGL performance).
 
-Use the control panel to toggle between Moduli Localization and Memory Burden phases.
+Use the control panel to toggle between MBL Stabilization and Memory Burden phases.
 
 📊 Quantitative Benchmarks
 
-Based on the CCA v2.5 engine, the model demonstrates:
+Based on the CCA v2.6 engine, the model demonstrates:
 
 Thermalization Suppression: Stable NESS maintained for $>10^5$ cycles.
 
-Clustering Consistency: Power spectrum scaling consistent with cosmological CDM observations.
+Clustering Consistency: Power spectrum scaling consistent with cosmological CDM observations ($k^{-3}$ scaling).
 
 Complexity Minimization: Reduced computational action during "Lazy Evaluation" rendering.
 
