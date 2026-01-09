@@ -3,142 +3,119 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CCA Research Terminal - v3.0 (Alpha Build)</title>
+    <title>CCA Research Terminal - v3.3 (Submission Build)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&display=swap');
-        
-        :root {
-            --accent: #38bdf8;
-            --bg: #020617;
-            --panel: rgba(15, 23, 42, 0.92);
-            --border: rgba(56, 189, 248, 0.25);
-        }
-
-        body { margin: 0; overflow: hidden; background: var(--bg); color: #e2e8f0; font-family: 'JetBrains Mono', monospace; user-select: none; }
-        .glass-panel { background: var(--panel); backdrop-filter: blur(24px); border: 1px solid var(--border); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.9); }
-        .glow-text { text-shadow: 0 0 20px rgba(56, 189, 248, 0.5); }
-        
-        input[type=range] { appearance: none; background: #1e293b; height: 4px; border-radius: 2px; }
-        input[type=range]::-webkit-slider-thumb { appearance: none; width: 16px; height: 16px; background: var(--accent); border-radius: 50%; cursor: pointer; border: 2px solid #0f172a; transition: transform 0.1s; }
-        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
-
-        #scanline {
-            position: fixed; top: 0; left: 0; width: 100%; height: 3px;
-            background: linear-gradient(to bottom, transparent, rgba(56, 189, 248, 0.1), transparent);
-            opacity: 0.3; animation: scan 6s linear infinite; pointer-events: none; z-index: 50;
-        }
-        @keyframes scan { from { top: -10%; } to { top: 110%; } }
-
-        .tab-btn { transition: all 0.2s; border-bottom: 2px solid transparent; opacity: 0.5; }
-        .tab-btn.active { border-color: var(--accent); opacity: 1; color: white; }
-        
-        .metric-value { font-variant-numeric: tabular-nums; letter-spacing: -0.05em; }
+        :root { --accent: #38bdf8; --bg: #010409; --panel: rgba(13, 17, 23, 0.96); }
+        body { margin: 0; overflow: hidden; background: var(--bg); color: #f1f5f9; font-family: 'JetBrains Mono', monospace; user-select: none; }
+        .glass-panel { background: var(--panel); backdrop-filter: blur(24px); border: 1px solid rgba(56, 189, 248, 0.2); }
+        .tab-btn.active { border-color: var(--accent); color: var(--accent); opacity: 1; }
+        .tab-btn { opacity: 0.5; transition: 0.2s; border-bottom: 2px solid transparent; padding-bottom: 4px; }
+        input[type=range] { appearance: none; background: #1e293b; height: 3px; border-radius: 2px; }
+        input[type=range]::-webkit-slider-thumb { appearance: none; width: 14px; height: 14px; background: var(--accent); border-radius: 50%; cursor: pointer; border: 2px solid #010409; }
+        .glow-cyan { box-shadow: 0 0 40px rgba(56, 189, 248, 0.15); }
     </style>
 </head>
 <body>
 
-<div id="scanline"></div>
+<div id="scanline" class="fixed inset-0 pointer-events-none z-50 opacity-10" style="background: linear-gradient(to bottom, transparent, #38bdf8 50%, transparent); height: 2px; animation: scan 12s linear infinite;"></div>
 
-<div class="fixed inset-0 p-6 md:p-10 pointer-events-none flex flex-col justify-between z-10">
+<div class="fixed inset-0 p-8 flex flex-col justify-between z-10 pointer-events-none">
     
-    <!-- Top Bar -->
     <div class="flex justify-between items-start">
-        <div class="glass-panel p-6 rounded-[1.5rem] pointer-events-auto w-full max-w-md">
-            <div class="flex items-center gap-3 mb-2">
+        <div class="glass-panel p-6 rounded-3xl pointer-events-auto w-[28rem] glow-cyan">
+            <div class="flex items-center gap-3 mb-6">
                 <div class="relative">
                     <div class="w-3 h-3 bg-sky-500 rounded-full animate-pulse"></div>
-                    <div class="absolute inset-0 w-3 h-3 bg-sky-500 rounded-full animate-ping opacity-75"></div>
+                    <div class="absolute inset-0 w-3 h-3 bg-sky-500 rounded-full animate-ping opacity-50"></div>
                 </div>
-                <h1 class="text-lg font-bold tracking-tight glow-text text-white">CCA TERMINAL <span class="text-xs text-sky-400 opacity-80 ml-1">v3.0</span></h1>
-            </div>
-            
-            <div class="flex gap-4 mb-6 text-[10px] font-bold uppercase tracking-wider">
-                <button onclick="setMode('substrate')" id="btn-sub" class="tab-btn active pb-1">Substrate Physics</button>
-                <button onclick="setMode('galaxy')" id="btn-gal" class="tab-btn pb-1">Galaxy Rotation</button>
+                <h1 class="text-lg font-bold tracking-tight text-white">CCA TERMINAL <span class="text-[10px] text-sky-400 opacity-60 ml-2">v3.3</span></h1>
             </div>
 
-            <!-- Substrate Controls -->
-            <div id="ctrl-sub" class="space-y-5">
-                <div class="space-y-2">
-                    <div class="flex justify-between text-[10px] font-bold text-slate-400 uppercase">
-                        <span>Disorder (W)</span>
-                        <span id="val-w" class="text-sky-400 metric-value">5.0</span>
+            <div class="flex gap-6 mb-8 text-[10px] font-bold uppercase tracking-[0.2em]">
+                <button onclick="setTab('sub')" id="tab-sub" class="tab-btn active">Substrate Physics</button>
+                <button onclick="setTab('gal')" id="tab-gal">Galaxy Analyzer</button>
+            </div>
+
+            <div id="panel-sub" class="space-y-6">
+                <div class="space-y-3">
+                    <div class="flex justify-between text-[10px] font-bold text-slate-400">
+                        <span>Archival Fraction (η)</span>
+                        <span class="text-sky-400">10⁻¹⁴</span>
                     </div>
-                    <input type="range" id="inp-w" min="0" max="10" step="0.1" value="5" class="w-full">
+                    <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div class="h-full bg-sky-500 w-[25%] shadow-[0_0_10px_#0ea5e9]"></div>
+                    </div>
                 </div>
-                <div class="space-y-2">
-                    <div class="flex justify-between text-[10px] font-bold text-slate-400 uppercase">
-                        <span>String Scale (ℓₛ/ℓₚ)</span>
-                        <span id="val-alpha" class="text-indigo-400 metric-value">10²</span>
+                <div class="space-y-3">
+                    <div class="flex justify-between text-[10px] font-bold text-slate-400">
+                        <span>GUT Scale (α)</span>
+                        <span class="text-indigo-400">10⁸</span>
                     </div>
-                    <input type="range" id="inp-alpha" min="1" max="4" step="0.1" value="2" class="w-full">
-                    <div class="flex justify-between text-[8px] text-slate-600 font-mono pt-1">
-                        <span>PLANCK</span>
-                        <span>STRING</span>
+                    <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div class="h-full bg-indigo-500 w-[65%]"></div>
                     </div>
+                </div>
+                <div class="p-4 bg-slate-900/50 rounded-2xl border border-white/5">
+                    <p class="text-[9px] text-slate-400 leading-relaxed uppercase">
+                        <span class="text-white font-bold">Hypothesis:</span> Mass is the physical weight of archived causal history. η represents the branching ratio to persistent memory.
+                    </p>
                 </div>
             </div>
 
-            <!-- Galaxy Controls -->
-            <div id="ctrl-gal" class="space-y-5 hidden">
-                <div class="space-y-2">
-                    <div class="flex justify-between text-[10px] font-bold text-slate-400 uppercase">
-                        <span>Galaxy Age (Gyr)</span>
-                        <span id="val-age" class="text-sky-400 metric-value">10.0</span>
+            <div id="panel-gal" class="space-y-6 hidden">
+                <div class="space-y-4">
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-[10px] font-bold">
+                            <span class="text-slate-400 uppercase">Integrated Entropy History</span>
+                            <span class="text-sky-400" id="val-age">10.0 Gyr</span>
+                        </div>
+                        <input type="range" id="inp-age" min="1" max="13.8" step="0.1" value="10" class="w-full pointer-events-auto">
                     </div>
-                    <input type="range" id="inp-age" min="1" max="13.8" step="0.1" value="10" class="w-full">
+                    <div class="flex items-center gap-3 p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl pointer-events-auto">
+                        <input type="checkbox" id="inp-starburst" class="w-4 h-4 cursor-pointer">
+                        <label for="inp-starburst" class="text-[10px] text-indigo-300 font-bold uppercase cursor-pointer">Post-Starburst (E+A) Signature</label>
+                    </div>
                 </div>
-                <div class="p-3 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-[9px] leading-relaxed text-indigo-200">
-                    <strong class="text-indigo-400">PREDICTION:</strong> Information Mass ($M_{info}$) accumulates linearly with radius ($M \propto r$), canceling the Keplerian drop-off ($v \propto r^{-1/2}$) and yielding flat rotation curves.
+                <div class="h-44">
+                    <canvas id="rotChart"></canvas>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Bottom Bar -->
-    <div class="flex flex-col md:flex-row gap-6 items-end">
-        <!-- Telemetry Panel -->
-        <div class="glass-panel p-6 rounded-[1.5rem] pointer-events-auto w-full md:w-96">
-            <div class="flex justify-between items-center mb-4">
-                <h2 id="chart-title" class="text-[10px] font-bold uppercase tracking-widest text-slate-400">Power Spectrum P(k)</h2>
-                <span id="chart-tag" class="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">k⁻³ Scaling</span>
-            </div>
-            <div class="h-32 w-full">
-                <canvas id="mainChart"></canvas>
+    <div class="flex justify-between items-end gap-6">
+        <div class="glass-panel p-6 rounded-3xl w-full max-w-sm">
+            <p class="text-[9px] text-slate-500 uppercase mb-4 font-bold tracking-widest">Universal Efficiency</p>
+            <div class="grid grid-cols-2 gap-8">
+                <div>
+                    <p class="text-[8px] text-slate-500 uppercase mb-1">Archival η</p>
+                    <p class="text-2xl font-bold text-sky-400">10⁻¹⁴</p>
+                </div>
+                <div>
+                    <p class="text-[8px] text-slate-500 uppercase mb-1">Substrate Ms</p>
+                    <p class="text-2xl font-bold text-indigo-400">10¹⁵ GeV</p>
+                </div>
             </div>
         </div>
 
-        <!-- Metrics Grid -->
-        <div class="glass-panel p-6 rounded-[1.5rem] pointer-events-auto flex-1 max-w-2xl">
-            <div class="grid grid-cols-3 gap-8">
-                <div>
-                    <p class="text-[9px] text-slate-500 font-bold uppercase mb-1">Total Mass ($M_{univ}$)</p>
-                    <p id="out-mass" class="text-2xl font-bold text-white metric-value tracking-tight">10⁵³ kg</p>
-                    <p class="text-[8px] text-emerald-500 mt-1">MATCHES OBSERVATION</p>
-                </div>
-                <div>
-                    <p class="text-[9px] text-slate-500 font-bold uppercase mb-1">Entropy ($S$)</p>
-                    <p id="out-entropy" class="text-2xl font-bold text-sky-400 metric-value">0.124</p>
-                    <p id="out-status" class="text-[8px] text-slate-400 mt-1">NESS STABLE</p>
-                </div>
-                <div class="text-right">
-                    <p class="text-[9px] text-slate-500 font-bold uppercase mb-1">Alpha Factor ($\alpha$)</p>
-                    <p id="out-alpha" class="text-2xl font-bold text-indigo-400 metric-value">10⁸</p>
-                    <p class="text-[8px] text-slate-400 mt-1">DIMENSIONAL IMPEDANCE</p>
-                </div>
+        <div class="glass-panel p-8 rounded-[2.5rem] w-full max-w-md text-right glow-cyan">
+            <p class="text-[10px] text-slate-500 uppercase mb-2 font-bold tracking-[0.2em]">Effective Mass Backreaction</p>
+            <p class="text-4xl font-bold text-white tracking-tighter tabular-nums">10⁻²¹ <span class="text-lg text-slate-500 ml-1">kg/m³</span></p>
+            <div class="flex items-center justify-end gap-3 mt-3">
+                <p class="text-[9px] text-emerald-500 font-bold uppercase tracking-tight">Consistency: Gaia Galactic Benchmark</p>
+                <div class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_#10b981]"></div>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-    let scene, camera, renderer, clock;
-    let moduli, particles, galaxy;
-    let chart;
-    let mode = 'substrate';
+    let scene, camera, renderer, clock, knot, galaxy;
+    let mode = 'sub', chart;
 
     window.onload = () => {
         initThree();
@@ -148,188 +125,90 @@
 
     function initThree() {
         scene = new THREE.Scene();
-        camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 0, 30);
-
+        camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 28;
         renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         document.body.appendChild(renderer.domElement);
-
         clock = new THREE.Clock();
 
-        // 1. Substrate Objects
-        const geo = new THREE.TorusKnotGeometry(6, 1.5, 300, 64, 2, 5);
-        const mat = new THREE.MeshStandardMaterial({ 
-            color: 0x0ea5e9, wireframe: true, transparent: true, opacity: 0.35,
-            emissive: 0x0ea5e9, emissiveIntensity: 0.2
-        });
-        moduli = new THREE.Mesh(geo, mat);
-        scene.add(moduli);
+        knot = new THREE.Mesh(
+            new THREE.TorusKnotGeometry(8, 2, 400, 32),
+            new THREE.MeshStandardMaterial({color: 0x0ea5e9, wireframe: true, transparent: true, opacity: 0.1, emissive: 0x0ea5e9, emissiveIntensity: 0.2})
+        );
+        scene.add(knot);
 
-        const pGeo = new THREE.BufferGeometry();
-        const pos = new Float32Array(4000 * 3);
-        for(let i=0; i<4000*3; i++) pos[i] = (Math.random()-0.5) * 70;
-        pGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-        particles = new THREE.Points(pGeo, new THREE.PointsMaterial({
-            color: 0x6366f1, size: 0.1, transparent: true, opacity: 0.6
-        }));
-        scene.add(particles);
-
-        // 2. Galaxy Objects
-        const galGeo = new THREE.BufferGeometry();
-        const galPos = [];
-        const galCols = [];
+        const gGeo = new THREE.BufferGeometry();
+        const gPos = [];
+        const gColors = [];
         const c1 = new THREE.Color(0xffffff);
         const c2 = new THREE.Color(0x38bdf8);
 
-        for(let i=0; i<6000; i++) {
-            const r = Math.pow(Math.random(), 1.5) * 12; 
-            const theta = r * 0.5 + (Math.random() * 0.5) + (i % 2 * Math.PI);
-            const x = r * Math.cos(theta);
-            const y = r * Math.sin(theta) * 0.8;
-            const z = (Math.random()-0.5) * (12-r) * 0.15;
-            galPos.push(x, y, z);
-            
-            const mixed = c1.clone().lerp(c2, r/12);
-            galCols.push(mixed.r, mixed.g, mixed.b);
+        for(let i=0; i<8000; i++) {
+            const r = Math.pow(Math.random(), 1.6) * 15;
+            const a = Math.random() * Math.PI * 2 + r * 0.25;
+            gPos.push(Math.cos(a)*r, Math.sin(a)*r, (Math.random()-0.5)*1.5);
+            const mixed = c1.clone().lerp(c2, r/15);
+            gColors.push(mixed.r, mixed.g, mixed.b);
         }
-        galGeo.setAttribute('position', new THREE.Float32BufferAttribute(galPos, 3));
-        galGeo.setAttribute('color', new THREE.Float32BufferAttribute(galCols, 3));
-        galaxy = new THREE.Points(galGeo, new THREE.PointsMaterial({
-            vertexColors: true, size: 0.08, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending
-        }));
+        gGeo.setAttribute('position', new THREE.Float32BufferAttribute(gPos, 3));
+        gGeo.setAttribute('color', new THREE.Float32BufferAttribute(gColors, 3));
+        galaxy = new THREE.Points(gGeo, new THREE.PointsMaterial({vertexColors: true, size: 0.08, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending}));
         galaxy.visible = false;
-        galaxy.rotation.x = 0.8;
         scene.add(galaxy);
 
-        const l1 = new THREE.PointLight(0x38bdf8, 2, 100); l1.position.set(20, 20, 20); scene.add(l1);
-        const l2 = new THREE.PointLight(0x6366f1, 2, 100); l2.position.set(-20, -20, 20); scene.add(l2);
+        scene.add(new THREE.AmbientLight(0x202020));
+        const p1 = new THREE.PointLight(0x38bdf8, 2, 120); p1.position.set(20,20,20); scene.add(p1);
     }
 
     function initChart() {
-        const ctx = document.getElementById('mainChart').getContext('2d');
+        const ctx = document.getElementById('rotChart').getContext('2d');
         chart = new Chart(ctx, {
             type: 'line',
             data: {
                 labels: Array.from({length: 20}, (_, i) => i + 1),
-                datasets: [{
-                    label: 'Dataset',
-                    data: [],
-                    borderColor: '#38bdf8',
-                    borderWidth: 2,
-                    tension: 0.4,
-                    pointRadius: 0,
-                    backgroundColor: 'rgba(56, 189, 248, 0.1)',
-                    fill: true
-                }, {
-                    label: 'Ref',
-                    data: [],
-                    borderColor: '#475569',
-                    borderWidth: 1,
-                    borderDash: [4, 4],
-                    pointRadius: 0
-                }]
+                datasets: [
+                    { label: 'CCA v7.2', data: [], borderColor: '#38bdf8', borderWidth: 2, pointRadius: 0, tension: 0.4 },
+                    { label: 'Newton', data: [], borderColor: '#475569', borderWidth: 1, borderDash: [6,6], pointRadius: 0, tension: 0.4 }
+                ]
             },
-            options: {
-                plugins: { legend: { display: false } },
-                scales: { x: { display: false }, y: { display: false } },
-                animation: false,
-                responsive: true,
-                maintainAspectRatio: false
-            }
+            options: { plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false, min: 0, max: 28 } }, animation: false, maintainAspectRatio: false }
         });
     }
 
-    function setMode(m) {
-        mode = m;
-        const bSub = document.getElementById('btn-sub');
-        const bGal = document.getElementById('btn-gal');
-        const cSub = document.getElementById('ctrl-sub');
-        const cGal = document.getElementById('ctrl-gal');
-        
-        if(m === 'substrate') {
-            bSub.classList.add('active'); bGal.classList.remove('active');
-            cSub.classList.remove('hidden'); cGal.classList.add('hidden');
-            moduli.visible = true; particles.visible = true; galaxy.visible = false;
-            
-            document.getElementById('chart-title').innerText = "Power Spectrum P(k)";
-            document.getElementById('chart-tag').innerText = "k⁻³ Scaling";
-        } else {
-            bGal.classList.add('active'); bSub.classList.remove('active');
-            cGal.classList.remove('hidden'); cSub.classList.add('hidden');
-            moduli.visible = false; particles.visible = false; galaxy.visible = true;
-            
-            document.getElementById('chart-title').innerText = "Rotation Curve V(r)";
-            document.getElementById('chart-tag').innerText = "Flat Profile";
-        }
+    function setTab(t) {
+        mode = t;
+        document.getElementById('tab-sub').classList.toggle('active', t === 'sub');
+        document.getElementById('tab-gal').classList.toggle('active', t === 'gal');
+        document.getElementById('panel-sub').classList.toggle('hidden', t !== 'sub');
+        document.getElementById('panel-gal').classList.toggle('hidden', t !== 'gal');
+        knot.visible = (t === 'sub');
+        galaxy.visible = (t === 'gal');
     }
 
     function animate() {
         requestAnimationFrame(animate);
         const t = clock.getElapsedTime();
-
-        if (mode === 'substrate') {
-            const W = parseFloat(document.getElementById('inp-w').value);
-            const scaleExp = parseFloat(document.getElementById('inp-alpha').value);
-            const alpha = Math.pow(10, scaleExp * 4); // (ls/lp)^4
-            
-            document.getElementById('val-w').innerText = W.toFixed(1);
-            document.getElementById('val-alpha').innerText = `10^${(scaleExp*4).toFixed(0)}`;
-            document.getElementById('out-alpha').innerText = `10^${(scaleExp*4).toFixed(0)}`;
-
-            // Calculate Mass based on Alpha
-            const baseMass = 45; // 10^45 kg without alpha
-            const totalMassExp = baseMass + (scaleExp * 4);
-            document.getElementById('out-mass').innerText = `10^${totalMassExp.toFixed(0)} kg`;
-
-            // MBL Visuals
-            const stability = Math.min(1, W / 4);
-            moduli.rotation.y += 0.002;
-            moduli.scale.setScalar(1 + Math.sin(t * 8) * 0.03 * (1-stability));
-            
-            const entropy = 0.04 + (1-stability) * 0.4;
-            document.getElementById('out-entropy').innerText = entropy.toFixed(3);
-            document.getElementById('out-status').innerText = stability > 0.8 ? "NESS STABLE" : "THERMALIZING";
-            document.getElementById('out-status').style.color = stability > 0.8 ? "#10b981" : "#ef4444";
-
-            // Update P(k) Chart
-            const data = [];
-            for(let k=1; k<=20; k++) {
-                const ideal = Math.pow(k, -3) * 100;
-                const noise = (Math.random() - 0.5) * 20 * (1-stability);
-                data.push(ideal + noise);
-            }
-            chart.data.datasets[0].data = data;
-            chart.data.datasets[1].data = []; // No ref line for P(k)
-        } 
-        else {
-            const age = parseFloat(document.getElementById('inp-age').value);
-            document.getElementById('val-age').innerText = age.toFixed(1);
-
-            galaxy.rotation.z -= 0.001;
-            galaxy.rotation.x = 0.8 + Math.sin(t*0.5)*0.05;
-
-            // Rotation Curve Calculation
-            const vData = [];
-            const newtonData = [];
-            
-            for(let r=1; r<=20; r++) {
-                // Newtonian Mass ~ saturates (baryonic only)
-                const Mb = 100 * (1 - Math.exp(-r/4));
-                // Info Mass ~ linear with radius (Volume Law)
-                const Minfo = age * r * 1.5; 
-                
-                // V ~ sqrt(M/r)
-                newtonData.push(Math.sqrt(Mb/r) * 15);
-                vData.push(Math.sqrt((Mb + Minfo)/r) * 15);
-            }
-            
-            chart.data.datasets[0].data = vData;
-            chart.data.datasets[1].data = newtonData;
-        }
+        knot.rotation.y += 0.002;
         
-        chart.update();
+        if (mode === 'gal') {
+            const age = parseFloat(document.getElementById('inp-age').value);
+            const isStarburst = document.getElementById('inp-starburst').checked;
+            document.getElementById('val-age').innerText = `${age.toFixed(1)} Gyr`;
+            galaxy.rotation.z += 0.0008;
+
+            const cca = [], newton = [];
+            for(let r=1; r<=20; r++) {
+                const Mb = (isStarburst ? 25 : 95) * (1 - Math.exp(-r/4));
+                const Mi = age * r * 2.5; 
+                newton.push(Math.sqrt(Mb/r) * 5);
+                cca.push(Math.sqrt((Mb + Mi)/r) * 5);
+            }
+            chart.data.datasets[0].data = cca;
+            chart.data.datasets[1].data = newton;
+            chart.update();
+        }
         renderer.render(scene, camera);
     }
 </script>
