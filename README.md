@@ -1,59 +1,83 @@
 Cyclical Causal Automata (CCA) Research
 
-This repository contains the theoretical framework and computational proof-of-concept for the Cyclical Causal Automata (CCA) model. This project explores a non-equilibrium, information-theoretic approach to M-theory moduli stabilization and the emergence of Dark Matter.
-
-🌌 Overview
-
-Traditional approaches to the string landscape often rely on static flux compactification. The CCA framework proposes a dynamical alternative: the universe operates as a resource-constrained computational system. By replacing stochastic randomness with a Deterministic Floquet Schedule, the model investigates how cyclical dynamics can stabilize high-dimensional moduli and generate emergent gravitational phenomena.
+This repository contains the scientific framework and computational terminal for the Cyclical Causal Automata (CCA) model (v7.2). This research introduces a non-equilibrium, information-theoretic approach to M-theory moduli stabilization and the nature of Dark Matter.
 
 🧬 Scientific Framework
 
-1. MBL-Protected Floquet Moduli
+1. Dark Matter as Archival Burden
 
-Utilizing Many-Body Localization (MBL), the model demonstrates how the internal 11D moduli sector remains stable against Floquet heating. This creates a Non-Equilibrium Steady State (NESS) that prevents vacuum decay, acting as a discrete time crystal at the substrate level.
+We propose that dark matter is not a particle, but the gravitational backreaction of information archival in a resource-constrained computational universe. With an archival efficiency of 
 
-2. Dark Matter as Archival Burden
+$$\eta \approx 10^{-14}$$
 
-We propose that dark matter is not a particle, but the gravitational backreaction of information archival in the causal substrate. With an archival efficiency of $\eta \approx 10^{-14}$ and a hierarchy factor $\alpha \approx 10^8$ (GUT-scale calibrated), the model derives observed dark matter densities ($10^{-21}$ kg/m³) from first principles.
+, the model derives observed dark matter densities (
 
-3. Wavefunction Collapse as "Lazy Evaluation"
+$$\rho_{dm} \approx 10^{-21}$$
 
-The framework interprets wavefunction collapse as a Resource Optimization Protocol. The system maintains a low-cost unitary superposition and only "renders" definitive states when informational queries demand causal consistency, minimizing global algorithmic depth.
+ kg/m³) from first principles.
 
-🛠 Simulation: CCA Research Terminal (v2.5)
+2. GUT-Scale Calibration (
 
-The primary simulation tool is included in this repository as research.html.
+$$\alpha \approx 10^8$$
+
+)
+
+By anchoring the framework to the Grand Unification (GUT) scale (
+
+$$10^{15}$$
+
+ GeV), we establish a natural hierarchy factor. This explains the observed ratio between dark matter and baryonic matter without ad hoc particles.
+
+3. Falsifiable Prediction: The Post-Starburst Excess
+
+Unlike standard Cold Dark Matter (CDM), the CCA framework predicts a unique correlation between a galaxy's integrated entropy history and its dark matter fraction. Post-Starburst (E+A) galaxies are predicted to exhibit a 
+
+$$1.5\text{--}2\times$$
+
+ higher dark matter fraction than quiescent galaxies of equal mass.
+
+🛠 Simulation: CCA Research Terminal (v3.3)
+
+The primary simulation tool is included as research.html.
 
 Features:
 
-Substrate Physics: Visualize MBL-stabilization and the Floquet-driven moduli configuration.
+Substrate Physics: Visualizing MBL-stabilization and Floquet-driven moduli.
 
-Archival Analyzer: Demonstrate how volume-law history archival generates flat rotation curves ($M \propto r$ scaling).
+Archival Analyzer: Demonstrating how volume-law history archival generates flat rotation curves (
 
-Phase Space Monitor: Real-time tracking of the transition between localization and thermalization.
+$$M \propto r$$
 
-How to Run:
+).
 
-Download research.html.
-
-Open the file in any modern web browser.
-
-Use the control panel to toggle between Substrate Physics and Galactic History modes.
+Falsifiability Test: Interactive "Post-Starburst" mode to visualize unique galactic signatures.
 
 📊 Quantitative Benchmarks
 
-Halo Density: Matches Gaia-derived observations ($\rho_{dm} \approx 10^{-21}$ kg/m³) using the $\alpha=10^8$ hierarchy factor.
+Halo Density: Matches Gaia-derived observations (
 
-Spectral Scaling: Emergent power spectrum consistent with $k^{-3}$ CDM clustering.
+$$\rho_{dm} \approx 10^{-21}$$
 
-Stability: NESS maintained for $>10^5$ Floquet cycles in localized phases.
+ kg/m³) using 
 
-📚 Falsifiable Predictions
+$$\alpha = 10^8$$
 
-A unique signature of this model is the Post-Starburst Excess. The CCA framework predicts that galaxies with a high "Entropy History" but low current star-formation activity (E+A galaxies) will exhibit anomalously high dark matter fractions compared to quiescent galaxies of equal mass.
+.
+
+Spectral Scaling: Emergent power spectrum consistent with 
+
+$$k^{-3}$$
+
+ CDM clustering.
+
+NESS Stability: Stable for 
+
+$$>10^5$$
+
+ Floquet cycles.
 
 Author: Alexey Lukin
 
-Version: 7.2 / Terminal v2.5
+Version: 7.2 (Submission Build)
 
 Technical Basis: Quantum Information Theory / String Phenomenology / Non-Equilibrium Dynamics
