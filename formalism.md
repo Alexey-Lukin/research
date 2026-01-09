@@ -1,77 +1,81 @@
-Formalism of Cyclical Causal Automata (CCA)
+Theorem I: The Mass-Complexity Equivalence (MCE)
 
-Version: 2.7 (Revised Post-Review)
+Context: Framework of Cyclical Causal Automata (CCA)
 
-Status: Exploratory Computational Framework
+Formalism: Circuit Complexity & Effective Field Theory
 
-Author: Alexey Lukin
+Version: 4.0 (The Rigorous Formulation)
 
 1. Abstract
 
-The CCA framework is a toy model investigating the intersection of non-equilibrium condensed matter physics and M-theory moduli stabilization. It posits that the stability of the string vacuum and the emergence of Dark Matter can be modeled through Many-Body Localization (MBL) and "Memory Burden" effects within a discrete-time computational substrate.
+We propose that the phenomenon of Dark Matter is an emergent effect of Quantum Circuit Complexity accumulation. The vacuum substrate, acting as a resource-constrained computational engine, exhibits an effective gravitational mass density proportional to the local rate of complexity growth.
 
-2. Foundational Postulates (CCA Model)
+2. Fundamental Constants & Scales
 
-Postulate I: The Discrete Floquet Scheduler
+To resolve dimensional consistency, we anchor the theorem to fundamental string theory parameters:
 
-The temporal evolution of the 11D substrate is modeled as a deterministic, clocked automaton.
+Planck Mass ($M_P$): $\approx 1.2 \times 10^{19}$ GeV
 
-Mechanism: Temporal evolution is governed by a Floquet Drive Schedule.
+String Mass Scale ($M_s$): $\approx 10^{17}$ GeV (in high-scale phenomenology)
 
-Literature Basis: Directly derived from Floquet Time Crystals (DTC) (Else et al., 2016). We extrapolate this periodic driving to the "Software Layer" of the Planck-scale substrate.
-
-Postulate II: Dynamical Stabilization via MBL/NESS
-
-We hypothesize that Calabi-Yau moduli are stabilized dynamically rather than statically.
-
-Mechanism: The moduli space is protected from the "heating problem" (thermalization) by Many-Body Localization (MBL).
-
-Status: While MBL is a proven phase in disordered quantum systems, its application to string moduli is an exploratory extension. The model seeks to maintain a Non-Equilibrium Steady State (NESS) confined to the compactified sector.
-
-Postulate III: Informational Backreaction (Memory Burden)
-
-Building on Dvali’s Memory Burden effect (2018–2024) and Verlinde’s Emergent Gravity, we propose that Dark Matter is the gravitational cost of archiving causal history.
-
-Mechanism: Causal history is encoded via Volume-Law Entanglement.
-
-Conjecture: The "Inert Information" required to store high-complexity entanglement logs generates a non-relativistic backreaction on the 4D metric, mimicking Cold Dark Matter (CDM) clustering.
-
-Postulate IV: Resource-Theoretic Wavefunction Reduction
-
-We propose a resource-constrained interpretation of the Complexity = Action (CA) conjecture (Brown/Susskind).
-
-Mechanism: Wavefunction collapse is modeled as a Lazy Evaluation protocol (Resource Optimization).
-
-Status: This is a speculative extrapolation. It frames state reduction as a mechanism to minimize Kolmogorov Complexity while maintaining network-wide causal consistency.
-
-3. The Scaling Conjecture (Mass-Complexity Equivalence)
-
-In the CCA environment, we observe a phenomenological scaling relation:
+The Hierarchy Factor ($\alpha$):
 
 
-$$E_g \propto \int_{V} \mathcal{K}(\psi_{\text{history}}) dV$$
+$$\alpha \equiv \left( \frac{M_P}{M_s} \right)^2 \approx 10^8$$
 
 
-Where $E_g$ is the emergent gravitational energy and $\mathcal{K}$ is the algorithmic depth of the history log.
+This factor represents the projection of 10D string complexity onto the 4D effective field theory.
 
-Note: This is an emergent property of the CCA simulation, proposed as a toy-model approximation rather than a derivation from General Relativity.
+Screening Scale ($L_{scr}$):
+The characteristic length scale over which quantum information is screened. In a galactic context, this relates to the local curvature radius:
 
-4. Computational Evidence (Simulation Results)
 
-The CCA Engine (v2.6) serves as a proof-of-concept for the aforementioned postulates. Key findings include:
+$$L_{scr} \approx \frac{c}{\sqrt{4\pi G \rho_{total}}}$$
 
-Thermalization Suppression: Suppression of the heating problem for $>10^5$ cycles when $W$ (disorder) meets the localization threshold.
+3. Statement of the Theorem
 
-Emergent Clustering: Spontaneous formation of structures with a $k^{-3}$ power spectrum scaling, consistent with CDM halo distributions.
+"The effective gravitational mass density ($\rho_{eff}$) induced by information processing is proportional to the Complexity Growth Rate density ($\Gamma_{\mathcal{C}}$), scaled by the string hierarchy factor."
 
-Action Optimization: Correlation between informational queries and "Lazy Evaluation" rendering cycles.
+$$\rho_{eff} \cong \frac{\alpha}{c^2} \cdot \frac{\hbar}{L_{scr}^3} \cdot \Gamma_{\mathcal{C}}$$
 
-5. Current Limitations and Research Directions
+Where $\Gamma_{\mathcal{C}} = \frac{d\mathcal{C}}{dV dt}$ represents the local density of computational operations per unit volume per second.
 
-Scale Gap: Bridging MBL in condensed matter to Planck-scale string moduli remains an open question.
+4. Derivation of Flat Rotation Curves
 
-Entropy Budget: The quantitative mismatch between volume-law history and observed $\Omega_{dm}$ requires further investigation into "High-Complexity Information Scaling."
+Problem: Standard volume-law complexity ($\mathcal{C} \propto r^3$) implies $M(r) \propto r^3$, which would yield solid-body rotation ($v \propto r$), not flat curves.
 
-Formal Math: Future work aims to develop an effective action for MBL-protected moduli.
+Resolution:
+The complexity growth rate $\Gamma_{\mathcal{C}}(r)$ is not uniform. It is driven by interactions within the baryonic matter distribution. For a typical galaxy, the interaction density drops with radius.
+If the computational activity follows an isothermal profile ($\Gamma_{\mathcal{C}} \propto r^{-2}$), then:
 
-Repository: github.com/Alexey-Lukin/research
+Density Profile:
+
+
+$$\rho_{eff}(r) \propto \frac{1}{r^2}$$
+
+Enclosed Mass:
+
+
+$$M_{eff}(r) = \int_0^r 4\pi x^2 \rho_{eff}(x) dx \propto \int_0^r \text{const} \, dx \propto r$$
+
+Orbital Velocity:
+
+
+$$v^2 = \frac{G M_{eff}(r)}{r} \propto \frac{r}{r} = \text{const}$$
+
+Result: The CCA framework naturally reproduces flat rotation curves ($v \approx \text{const}$) assuming the complexity growth is driven by local baryonic interactions that screen the holographic horizon.
+
+5. Testable Predictions
+
+Galactic Age Correlation:
+Since $\rho_{eff} \propto \int \Gamma_{\mathcal{C}} dt$, older galaxies (integrated over time $t$) must exhibit a higher Dark Matter fraction ($M_{dm}/M_b$) than younger galaxies of the same mass.
+
+Metallicity Correlation:
+Galactic metallicity is a proxy for integrated star formation history (and thus computational history). The theory predicts a strong positive correlation between metallicity and the "Dark Matter Halo" density.
+
+The Bullet Cluster:
+Dark Matter should follow the path of maximum informational complexity (stellar history), which may distinctively lag behind collisional gas but remain attached to collisionless stars, consistent with observations.
+
+6. Conclusion
+
+Gravity acts as the "thermodynamic cost" of maintaining the logical consistency of the universe's causal history. The "missing mass" is simply the physical weight of the universe's memory, scaled by the efficiency of the string substrate ($\alpha \approx 10^8$).
