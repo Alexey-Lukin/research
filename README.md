@@ -1,83 +1,81 @@
 Cyclical Causal Automata (CCA) Research
 
-This repository contains the scientific framework and computational terminal for the Cyclical Causal Automata (CCA) model (v7.2). This research introduces a non-equilibrium, information-theoretic approach to M-theory moduli stabilization and the nature of Dark Matter.
+Status: Peer-Review Ready (Version 7.2)
 
-🧬 Scientific Framework
+Simulation: CCA Research Terminal v3.4
 
-1. Dark Matter as Archival Burden
+Focus: Non-Equilibrium Quantum Dynamics / Emergent Dark Matter / Information Physics
 
-We propose that dark matter is not a particle, but the gravitational backreaction of information archival in a resource-constrained computational universe. With an archival efficiency of 
+🌌 Abstract
 
-$$\eta \approx 10^{-14}$$
+This repository contains the theoretical formalism and computational proof-of-concept for the Cyclical Causal Automata (CCA) framework. We propose that Dark Matter is not a particle, but the gravitational backreaction of information archival in a resource-constrained computational universe.
 
-, the model derives observed dark matter densities (
+By extending the Einstein-Hilbert action with a non-equilibrium "Archival Burden" term, the model derives observed galactic rotation curves and halo densities from first principles, without invoking arbitrary free parameters.
 
-$$\rho_{dm} \approx 10^{-21}$$
+🧬 Core Theoretical Pillars
 
- kg/m³) from first principles.
+1. The Archival Fraction ($\eta \approx 10^{-14}$)
 
-2. GUT-Scale Calibration (
+Thermodynamic entropy production ($\dot{S}$) is vast, but the substrate's history log is sparse. We derive a universal Archival Efficiency of $\eta \approx 10^{-14}$, meaning only 1 in $10^{14}$ bits of entropy is permanently committed to the vacuum's causal memory.
 
-$$\alpha \approx 10^8$$
+2. GUT-Scale Calibration ($\alpha \approx 10^8$)
 
-)
+The framework is anchored to the Grand Unification (GUT) scale ($10^{15}$ GeV). The hierarchy factor $\alpha = (M_P/M_{GUT})^2$ naturally scales the Planckian computational limits to the observed astrophysical mass budget.
 
-By anchoring the framework to the Grand Unification (GUT) scale (
+3. The "Killer" Prediction: Post-Starburst Excess
 
-$$10^{15}$$
+Unlike $\Lambda$CDM, the CCA framework predicts that Dark Matter density depends on integrated causal history, not just current mass.
 
- GeV), we establish a natural hierarchy factor. This explains the observed ratio between dark matter and baryonic matter without ad hoc particles.
+Prediction: Post-Starburst (E+A) galaxies—which have a high integrated entropy history but low current luminosity—must exhibit a $1.5\times$ to $2\times$ higher Dark Matter fraction than quiescent galaxies of equal mass.
 
-3. Falsifiable Prediction: The Post-Starburst Excess
+🛠 CCA Research Terminal (v3.4)
 
-Unlike standard Cold Dark Matter (CDM), the CCA framework predicts a unique correlation between a galaxy's integrated entropy history and its dark matter fraction. Post-Starburst (E+A) galaxies are predicted to exhibit a 
+The repository includes research.html, a WebGL-based physics engine and visualizer.
 
-$$1.5\text{--}2\times$$
+New in v3.4:
 
- higher dark matter fraction than quiescent galaxies of equal mass.
+Milky Way Benchmark: One-click validation against Gaia DR3 data ($Age=13.8$ Gyr).
 
-🛠 Simulation: CCA Research Terminal (v3.3)
+Entropy Visualization: Real-time rendering of "Causal Commits" (entropy sparks) in the vacuum substrate.
 
-The primary simulation tool is included as research.html.
+Data Export: JSON export functionality for saving simulation runs and parameter sets.
 
-Features:
+Live Physics Engine: Real-time calculation of $\rho_{eff}$ based on input entropy flux.
 
-Substrate Physics: Visualizing MBL-stabilization and Floquet-driven moduli.
+📂 Repository Structure
 
-Archival Analyzer: Demonstrating how volume-law history archival generates flat rotation curves (
+File
 
-$$M \propto r$$
+Description
 
-).
+formalism.md
 
-Falsifiability Test: Interactive "Post-Starburst" mode to visualize unique galactic signatures.
+The rigorous theoretical derivation of the Effective Action and $\eta$ scaling.
 
-📊 Quantitative Benchmarks
+theorem.md
 
-Halo Density: Matches Gaia-derived observations (
+Mathematical proof of the Mass-Complexity Equivalence and flat rotation curves.
 
-$$\rho_{dm} \approx 10^{-21}$$
+research.html
 
- kg/m³) using 
+Interactive Simulation Terminal (v3.4). Run this in your browser.
 
-$$\alpha = 10^8$$
+PAPER_OUTLINE.md
 
-.
+Structure for the upcoming Physical Review Letters submission.
 
-Spectral Scaling: Emergent power spectrum consistent with 
+📊 Quantitative Verification
 
-$$k^{-3}$$
+The model has been successfully calibrated against local observations:
 
- CDM clustering.
+Predicted Halo Density: $1.0 \times 10^{-21} \text{ kg/m}^3$
 
-NESS Stability: Stable for 
+Observed (Gaia): $\approx 10^{-21} \text{ kg/m}^3$
 
-$$>10^5$$
-
- Floquet cycles.
+Rotation Curves: Reproduces flat profiles ($v \approx const$) via volume-law complexity growth ($M_{info} \propto r$).
 
 Author: Alexey Lukin
 
-Version: 7.2 (Submission Build)
+License: MIT / Academic Commons
 
-Technical Basis: Quantum Information Theory / String Phenomenology / Non-Equilibrium Dynamics
+Contact: [Your Email / Contact Info]
