@@ -70,7 +70,7 @@
                 <div class="space-y-4">
                     <div class="space-y-2">
                         <div class="flex justify-between text-[10px] font-bold">
-                            <span class="text-slate-400 uppercase">Integrated Entropy History</span>
+                            <span class="text-slate-400 uppercase">Integrated History Age</span>
                             <span class="text-sky-400" id="val-age">10.0 Gyr</span>
                         </div>
                         <input type="range" id="inp-age" min="1" max="13.8" step="0.1" value="10" class="w-full pointer-events-auto">
@@ -169,8 +169,8 @@
             data: {
                 labels: Array.from({length: 20}, (_, i) => i + 1),
                 datasets: [
-                    { label: 'CCA v7.2', data: [], borderColor: '#38bdf8', borderWidth: 2, pointRadius: 0, tension: 0.4 },
-                    { label: 'Newton', data: [], borderColor: '#475569', borderWidth: 1, borderDash: [6,6], pointRadius: 0, tension: 0.4 }
+                    { label: 'CCA v7.2 (DM+Baryon)', data: [], borderColor: '#38bdf8', borderWidth: 2, pointRadius: 0, tension: 0.4 },
+                    { label: 'Newtonian (Baryon Only)', data: [], borderColor: '#475569', borderWidth: 1, borderDash: [6,6], pointRadius: 0, tension: 0.4 }
                 ]
             },
             options: { plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false, min: 0, max: 28 } }, animation: false, maintainAspectRatio: false }
@@ -200,8 +200,16 @@
 
             const cca = [], newton = [];
             for(let r=1; r<=20; r++) {
-                const Mb = (isStarburst ? 25 : 95) * (1 - Math.exp(-r/4));
-                const Mi = age * r * 2.5; 
+                // Post-starburst (E+A) logic:
+                // Mb (Current Baryons) is lower because the burst is over and gas is depleted/stars are dimmer.
+                // Mi (Informational Mass) remains HIGH because it depends on the INTEGRATED history (age).
+                
+                const baryonicScale = isStarburst ? 20 : 90; // Reduced visible mass in post-starburst
+                const historyScale = isStarburst ? 3.5 : 2.5; // High history burden relative to current light
+                
+                const Mb = baryonicScale * (1 - Math.exp(-r/4));
+                const Mi = age * r * historyScale; 
+                
                 newton.push(Math.sqrt(Mb/r) * 5);
                 cca.push(Math.sqrt((Mb + Mi)/r) * 5);
             }
