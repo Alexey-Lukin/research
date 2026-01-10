@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CCA Research Terminal - v3.9 (Tensor Build)</title>
+    <title>CCA Research Terminal - v3.9 (Strategic Build)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
@@ -28,6 +28,7 @@
 
 <div class="scanline"></div>
 
+<!-- Top Control HUD -->
 <div class="fixed inset-0 p-4 md:p-8 flex flex-col justify-between z-10 pointer-events-none">
     
     <div class="flex flex-col md:flex-row justify-between items-start gap-4">
@@ -38,17 +39,18 @@
                     <div class="absolute inset-0 w-3 h-3 bg-sky-500 rounded-full animate-ping opacity-50"></div>
                 </div>
                 <div>
-                    <h1 class="text-xs font-bold tracking-tight text-white uppercase">CCA Tensor Terminal <span class="text-sky-400 opacity-60 ml-1">v3.9</span></h1>
-                    <p class="text-[8px] text-slate-500 font-bold uppercase tracking-[0.2em]">Effective Field Theory DM Visualizer</p>
+                    <h1 class="text-xs font-bold tracking-tight text-white uppercase">CCA Strategic Terminal <span class="text-sky-400 opacity-60 ml-1">v3.9</span></h1>
+                    <p class="text-[8px] text-slate-500 font-bold uppercase tracking-[0.2em]">Tensor Effective Field Theory Analysis</p>
                 </div>
-                <div class="ml-auto px-2 py-0.5 border border-sky-500/30 rounded text-[8px] text-sky-400 font-bold uppercase tracking-widest">Tensor-Covariant</div>
+                <div class="ml-auto px-2 py-0.5 border border-sky-500/30 rounded text-[8px] text-sky-400 font-bold uppercase tracking-widest">Grounded: Gaia DR3</div>
             </div>
 
             <div class="flex gap-6 mb-6 text-[10px] font-bold uppercase tracking-widest border-b border-white/5 pb-2">
                 <button onclick="setTab('sub')" id="tab-sub" class="tab-btn active">Substrate EFT</button>
-                <button onclick="setTab('gal')" id="tab-gal">History & Dynamics</button>
+                <button onclick="setTab('gal')" id="tab-gal">Galaxy Dynamics</button>
             </div>
 
+            <!-- Tab: Substrate Parameters -->
             <div id="panel-sub" class="space-y-6">
                 <div class="space-y-4">
                     <div class="space-y-2">
@@ -56,35 +58,36 @@
                             <span class="text-slate-400">Archival Coupling (η)</span>
                             <span class="text-sky-400" id="val-eta">10⁻¹⁴</span>
                         </div>
-                        <input type="range" id="inp-eta" min="-16" max="-12" step="0.1" value="-14">
+                        <input type="range" id="inp-eta" min="-16" max="-12" step="0.1" value="-14" class="pointer-events-auto">
                     </div>
                     <div class="space-y-2">
                         <div class="flex justify-between text-[10px] font-bold uppercase tracking-tighter">
                             <span class="text-slate-400">Hierarchy Scale (α)</span>
                             <span class="text-indigo-400" id="val-alpha">10⁸</span>
                         </div>
-                        <input type="range" id="inp-alpha" min="6" max="10" step="0.1" value="8">
+                        <input type="range" id="inp-alpha" min="6" max="10" step="0.1" value="8" class="pointer-events-auto">
                     </div>
                 </div>
-                <div class="p-3 bg-indigo-500/5 border border-indigo-500/10 rounded-xl">
-                    <p class="text-[8px] text-slate-400 leading-relaxed uppercase">
-                        <span class="text-white font-bold">Substrate Logic:</span> η represents the scale-dependent transition probability into the 11D moduli configuration.
+                <div class="p-3 bg-indigo-500/5 border border-indigo-500/10 rounded-xl relative">
+                    <p class="text-[8px] text-slate-400 leading-relaxed">
+                        <span class="text-white font-bold uppercase">v7.9 Tensor Logic:</span> Archival intensity is coupled to local scalar curvature $R$. Current state $w \approx 0$ (Dust limit).
                     </p>
                 </div>
             </div>
 
+            <!-- Tab: Galaxy History -->
             <div id="panel-gal" class="space-y-6 hidden">
                 <div class="space-y-3">
                     <div class="space-y-1">
                         <div class="flex justify-between text-[10px] font-bold uppercase tracking-tighter">
-                            <span class="text-slate-400">Integrated History (Gyr)</span>
+                            <span class="text-slate-400">Integrated History Age (Gyr)</span>
                             <span class="text-sky-400" id="val-age">10.0</span>
                         </div>
-                        <input type="range" id="inp-age" min="1" max="13.8" step="0.1" value="10">
+                        <input type="range" id="inp-age" min="1" max="13.8" step="0.1" value="10" class="pointer-events-auto">
                     </div>
                     <div class="grid grid-cols-2 gap-2">
-                        <button onclick="triggerStarburst()" id="starburst-btn" class="btn-action py-3 rounded-xl text-[8px] font-bold text-sky-400 uppercase">Trigger Starburst (E+A)</button>
-                        <button onclick="calibrateMW()" class="btn-action py-3 rounded-xl text-[8px] font-bold text-slate-500 uppercase tracking-tighter">Milky Way Match</button>
+                        <button onclick="triggerStarburst()" id="starburst-btn" class="btn-action py-3 rounded-xl text-[8px] font-bold text-sky-400 uppercase pointer-events-auto">Trigger Starburst (E+A)</button>
+                        <button onclick="calibrateMW()" class="btn-action py-3 rounded-xl text-[8px] font-bold text-slate-500 uppercase tracking-tighter pointer-events-auto">Reset Calibration</button>
                     </div>
                 </div>
                 <div class="h-32 bg-slate-900/40 rounded-xl p-2 border border-white/5">
@@ -94,26 +97,27 @@
         </div>
     </div>
 
+    <!-- Bottom Readout HUD -->
     <div class="flex flex-col md:flex-row justify-between items-end gap-4">
-        <div class="glass-panel p-5 rounded-3xl w-full md:w-[22rem]">
-            <p class="text-[8px] text-slate-500 uppercase mb-4 font-bold tracking-widest">Tensor State (w)</p>
+        <div class="glass-panel p-5 rounded-3xl w-full md:w-[22rem] pointer-events-auto">
+            <p class="text-[8px] text-slate-500 uppercase mb-4 font-bold tracking-widest">Informational State</p>
             <div class="space-y-3">
                 <div class="flex justify-between items-center">
-                    <span class="text-[9px] text-slate-400 uppercase">Equation of State</span>
+                    <span class="text-[9px] text-slate-400 uppercase">Equation of State (w)</span>
                     <span class="text-xs font-bold text-emerald-400">≈ 0.0 (Dust)</span>
                 </div>
                 <div class="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
-                    <div id="bar-intensity" class="h-full bg-sky-500 transition-all duration-500" style="width: 50%"></div>
+                    <div id="bar-intensity" class="h-full bg-emerald-500 transition-all duration-700" style="width: 5%"></div>
                 </div>
                 <p class="text-[7px] text-slate-600 uppercase italic">Archival ghost anchored to comoving nodes.</p>
             </div>
         </div>
 
-        <div class="glass-panel p-8 rounded-[2.5rem] w-full max-w-md text-right relative overflow-hidden">
+        <div class="glass-panel p-8 rounded-[2.5rem] w-full max-w-md text-right relative overflow-hidden pointer-events-auto">
             <div id="rho-pulse" class="absolute inset-0 bg-sky-500/5 opacity-0 pointer-events-none transition-opacity duration-300"></div>
             <p class="text-[9px] text-slate-500 uppercase mb-2 font-bold tracking-[0.2em]">Effective Density (ρ_dm)</p>
             <p class="text-4xl font-bold text-white tracking-tighter tabular-nums metric-glow" id="out-rho">8.4 × 10⁻²²</p>
-            <p class="text-[9px] text-slate-600 mt-1 uppercase font-light">kg/m³ (Gaia DR3 Benchmark)</p>
+            <p class="text-[9px] text-slate-600 mt-1 uppercase font-light">kg/m³ (Consistent with Gaia DR3)</p>
             <div class="flex items-center justify-end gap-3 mt-4 pt-4 border-t border-white/5">
                 <div id="status-tag" class="text-[8px] text-emerald-500 font-bold uppercase tracking-widest">Status: 1.2σ Consistent</div>
                 <div class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_12px_#10b981]"></div>
@@ -122,14 +126,20 @@
     </div>
 </div>
 
-<div id="intro" class="fixed inset-0 flex items-center justify-center bg-black/80 backdrop-blur-lg z-[100] cursor-pointer" onclick="closeIntro()">
-    <div class="glass-panel p-10 rounded-[3rem] text-center space-y-6 max-w-sm border-sky-500/40">
-        <h2 class="text-sky-400 font-bold uppercase tracking-widest text-lg">CCA Tensor Terminal</h2>
-        <p class="text-[10px] text-slate-500 font-bold uppercase mt-1">Version 3.9 - Tensor EFT Build</p>
+<!-- Intro Interaction Modal -->
+<div id="intro" class="fixed inset-0 flex items-center justify-center bg-black/80 backdrop-blur-md z-[100] cursor-pointer" onclick="closeIntro()">
+    <div class="glass-panel p-10 rounded-[3rem] text-center space-y-6 max-w-sm border-sky-500/40 pointer-events-auto">
+        <div class="w-16 h-16 border-2 border-sky-500 rounded-full mx-auto flex items-center justify-center">
+            <div class="w-10 h-10 bg-sky-500 rounded-full blur-md animate-pulse"></div>
+        </div>
+        <div>
+            <h2 class="text-sky-400 font-bold uppercase tracking-widest text-lg">CCA Strategic Terminal</h2>
+            <p class="text-[10px] text-slate-500 font-bold uppercase mt-1">Version 3.9 - Tensor Build</p>
+        </div>
         <p class="text-[11px] text-slate-300 leading-relaxed">
-            Dark Matter as the <b>Memory Burden</b> of causal history.<br><br>
-            Drag to <b>Rotate</b>. Pinch to <b>Zoom</b>.<br>
-            Toggle <b>E+A Mode</b> to see the informational mass excess.
+            Manipulate <b>Archival Efficiency (η)</b> and <b>Hierarchy (α)</b> to test the informational origin of Dark Matter.<br><br>
+            Drag to <b>Rotate</b>. Pinch/Scroll to <b>Zoom</b>.<br>
+            Trigger <b>Starburst</b> to witness the Memory Burden.
         </p>
         <p class="text-[9px] text-sky-500 animate-bounce uppercase font-bold tracking-tighter">Click to Initialize Substrate</p>
     </div>
@@ -157,7 +167,7 @@
     }
 
     function initThree() {
-        if (renderer) return; // Prevent double init
+        if (renderer) return; 
         scene = new THREE.Scene();
         camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.z = 35;
@@ -168,20 +178,22 @@
         document.body.appendChild(renderer.domElement);
         clock = new THREE.Clock();
 
+        // Substrate representation (Causal Moduli Knot)
         knot = new THREE.Mesh(
-            new THREE.TorusKnotGeometry(8, 2, 400, 32),
+            new THREE.TorusKnotGeometry(8, 1.8, 300, 32),
             new THREE.MeshStandardMaterial({
-                color: 0x38bdf8, wireframe: true, transparent: true, opacity: 0.12, emissive: 0x0ea5e9, emissiveIntensity: 0.3
+                color: 0x38bdf8, wireframe: true, transparent: true, opacity: 0.15, emissive: 0x0ea5e9, emissiveIntensity: 0.3
             })
         );
         scene.add(knot);
 
+        // Baryon Distribution (Galaxy Nodes)
         const gGeo = new THREE.BufferGeometry();
         const gPos = [];
         const gColors = [];
         for(let i=0; i<12000; i++) {
-            const r = Math.pow(Math.random(), 1.6) * 18;
-            const a = Math.random() * Math.PI * 2 + r * 0.25;
+            const r = Math.pow(Math.random(), 1.7) * 18;
+            const a = Math.random() * Math.PI * 2 + r * 0.22;
             const z = (Math.random() - 0.5) * Math.max(0.1, 2.5 - r * 0.12); 
             gPos.push(Math.cos(a) * r, Math.sin(a) * r, z);
             const mixed = new THREE.Color(0xffffff).lerp(new THREE.Color(0x0ea5e9), r/18);
@@ -190,11 +202,12 @@
         gGeo.setAttribute('position', new THREE.Float32BufferAttribute(gPos, 3));
         gGeo.setAttribute('color', new THREE.Float32BufferAttribute(gColors, 3));
         galaxy = new THREE.Points(gGeo, new THREE.PointsMaterial({
-            vertexColors: true, size: 0.08, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending
+            vertexColors: true, size: 0.07, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending
         }));
         galaxy.visible = false;
         scene.add(galaxy);
 
+        // Causal Commit Visualization
         const cpGeo = new THREE.BufferGeometry();
         const cpPos = new Float32Array(800 * 3);
         cpGeo.setAttribute('position', new THREE.BufferAttribute(cpPos, 3));
@@ -242,7 +255,7 @@
 
         window.addEventListener('wheel', e => {
             zoomScale = Math.max(15, Math.min(60, zoomScale + e.deltaY * 0.03));
-            camera.position.z = zoomScale;
+            if (camera) camera.position.z = zoomScale;
         });
 
         const update = () => {
@@ -302,7 +315,7 @@
             data: {
                 labels: Array.from({length: 20}, (_, i) => (i + 1) * 2),
                 datasets: [
-                    { label: 'CCA v7.8', data: [], borderColor: '#38bdf8', borderWidth: 2, pointRadius: 0, tension: 0.4 },
+                    { label: 'CCA v7.9', data: [], borderColor: '#38bdf8', borderWidth: 2, pointRadius: 0, tension: 0.4 },
                     { label: 'Newton', data: [], borderColor: '#475569', borderWidth: 1, borderDash: [4,4], pointRadius: 0, tension: 0.4 }
                 ]
             },
@@ -323,7 +336,7 @@
         const cca = [], newton = [];
         for(let r=1; r<=20; r++) {
             const Mb = (state.isEplusA ? 32 : 95) * (1 - Math.exp(-r/4.5)); 
-            const hFactor = state.isEplusA ? 4.6 : 2.5;
+            const hFactor = state.isEplusA ? 4.8 : 2.6;
             const Mi = state.age * r * hFactor * Math.pow(10, state.alpha - 8); 
             newton.push(Math.sqrt(Mb/r) * 55);
             cca.push(Math.sqrt((Mb + Mi)/r) * 55);
@@ -335,15 +348,15 @@
 
     function setTab(t) {
         mode = t;
-        const tabSub = document.getElementById('tab-sub');
-        const tabGal = document.getElementById('tab-gal');
-        const panelSub = document.getElementById('panel-sub');
-        const panelGal = document.getElementById('panel-gal');
+        const ts = document.getElementById('tab-sub');
+        const tg = document.getElementById('tab-gal');
+        const ps = document.getElementById('panel-sub');
+        const pg = document.getElementById('panel-gal');
 
-        if (tabSub) tabSub.classList.toggle('active', t === 'sub');
-        if (tabGal) tabGal.classList.toggle('active', t === 'gal');
-        if (panelSub) panelSub.classList.toggle('hidden', t !== 'sub');
-        if (panelGal) panelGal.classList.toggle('hidden', t !== 'gal');
+        if (ts) ts.classList.toggle('active', t === 'sub');
+        if (tg) tg.classList.toggle('active', t === 'gal');
+        if (ps) ps.classList.toggle('hidden', t !== 'sub');
+        if (pg) pg.classList.toggle('hidden', t !== 'gal');
 
         if (knot) knot.visible = (t === 'sub');
         if (galaxy) galaxy.visible = (t === 'gal');
@@ -353,21 +366,17 @@
         const inpEta = document.getElementById('inp-eta');
         const inpAlpha = document.getElementById('inp-alpha');
         const inpAge = document.getElementById('inp-age');
-        const btn = document.getElementById('starburst-btn');
-
         if (inpEta) inpEta.value = -14;
         if (inpAlpha) inpAlpha.value = 8;
         if (inpAge) inpAge.value = 13.8;
         state.isEplusA = false;
+        const btn = document.getElementById('starburst-btn');
         if (btn) btn.innerText = "Trigger Starburst (E+A)";
         
-        // Manual update because setting value doesn't trigger oninput
-        state.eta = -14;
-        state.alpha = 8;
-        state.age = 13.8;
-        safeSetText('val-eta', `10${fmtPow(state.eta)}`);
-        safeSetText('val-alpha', `10${fmtPow(state.alpha)}`);
-        safeSetText('val-age', state.age.toFixed(1));
+        state.eta = -14; state.alpha = 8; state.age = 13.8;
+        safeSetText('val-eta', `10⁻¹⁴`);
+        safeSetText('val-alpha', `10⁸`);
+        safeSetText('val-age', '13.8');
         
         runPhysics();
     }
@@ -397,4 +406,46 @@
         if (!camera || !renderer) return;
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
-        renderer.setSize(window.
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    function fmtPow(v) {
+        const p = "⁰¹²³⁴⁵⁶⁷⁸⁹";
+        const s = v < 0 ? "⁻" : "";
+        const a = Math.abs(Math.round(v)).toString();
+        let r = s;
+        for(let c of a) {
+            const idx = parseInt(c);
+            if (!isNaN(idx)) r += p[idx];
+        }
+        return r;
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        if (!clock || !renderer || !scene || !camera) return;
+        const t = clock.getElapsedTime();
+        
+        if(mode === 'sub' && knot) {
+            knot.rotation.y += 0.002;
+            knot.rotation.z += 0.001;
+            knot.scale.setScalar(1 + Math.sin(t * 1.5) * 0.02);
+        } else if (galaxy) {
+            galaxy.rotation.z += 0.0007;
+        }
+
+        if(burstIntensity > 0 && knot && commitParticles) {
+            burstIntensity -= 0.015;
+            knot.material.emissiveIntensity = 0.3 + burstIntensity * 8;
+            knot.scale.setScalar(1 + burstIntensity * 0.7);
+            commitParticles.material.opacity = burstIntensity;
+            const pos = commitParticles.geometry.attributes.position.array;
+            for(let i=0; i<pos.length; i++) pos[i] *= 1.04; 
+            commitParticles.geometry.attributes.position.needsUpdate = true;
+        }
+
+        renderer.render(scene, camera);
+    }
+</script>
+</body>
+</html>
