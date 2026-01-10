@@ -1,53 +1,54 @@
 Cyclical Causal Automata (CCA) Research
 
-Status: Submission-Ready (Version 7.6)
+Status: Submission-Ready (Version 7.8)
 
-Simulation: CCA Research Terminal v3.7 (Submission Build)
+Scientific Basis: Tensor Effective Field Theory / Information Cosmology
 
-Scientific Domain: Information Thermodynamics / Emergent Gravity / Dark Matter Phenomenology
+Target Journals: JCAP / Physical Review D
 
 Author: Alexey Lukin
 
 🌌 Overview
 
-This repository contains the theoretical framework and computational proof-of-concept for the Cyclical Causal Automata (CCA) model. We propose a fundamentally new solution to the dark matter problem: identifying it as the gravitational backreaction of information archival in a discrete causal substrate.
+This repository contains the theoretical framework for the CCA Framework, which identifies Dark Matter as the emergent gravitational backreaction of information archival in a discrete causal substrate.
 
-By scaling the Memory Burden effect (Dvali et al. 2025) to global cosmological scales, the framework derives observed galactic dark matter densities from information-theoretic principles without invoking new particle candidates.
+By defining the "Archival Burden" as a generally covariant tensor field coupled to the local scalar curvature $R$, the model derives observed galactic dynamics and local dark matter densities from information-theoretic principles, without the need for additional particle candidates.
 
-🧬 Key Theoretical Pillars
+🧬 Key Theoretical Upgrades (v7.8)
 
-1. Generally Covariant Effective Action
+1. Tensor Formulation ($T_{\mu\nu}$)
 
-The model introduces a coordinate-invariant formulation where the archival energy density is integrated into the Einstein-Hilbert action via a dimensionless Information Archival Intensity scalar $\mathcal{I}(x) \equiv \gamma_{\mathcal{A}}/H$.
+We have derived the archival stress-energy tensor $T_{\mu\nu}^{archival}$ from the variation of the archival action. We demonstrate that in the late-time limit, the archival ghost behaves as a pressureless fluid with an equation of state $w = p/\rho \approx 0$, fulfilling the requirements for Cold Dark Matter (CDM).
+
+2. Local Covariance
+
+The model ensures coordinate invariance by coupling the archival intensity $\mathcal{I}(x)$ to the local scalar curvature $R$:
 
 
-$$\rho_{dm}(x) \cong \alpha \cdot \rho_{crit} \cdot \left[ \mathcal{I}(x) \cdot \ell_P^3 \right]$$
+$$\mathcal{I}(x) \equiv \frac{\gamma_{\mathcal{A}}(x)}{\sqrt{R/6}}$$
 
-2. Scale-Invariant Coupling ($\eta \approx 10^{-14}$)
 
-Addressing the "fine-tuning" problem, we derive the archival efficiency $\eta$ as a geometric ratio between the UV substrate scale and the IR cosmological horizon. This represents the branching ratio of local informational updates that effectively transition the global 11D moduli configuration.
+This replaces the global Hubble parameter used in earlier versions, making the theory mathematically rigorous for General Relativity.
 
-3. Falsifiable Prediction: The Post-Starburst Signature
+3. Bullet Cluster Resolution
 
-The CCA framework predicts that dark matter density is history-dependent.
+The CCA framework provides a quantitative explanation for the Bullet Cluster. Since archival rates are driven by interaction intensity, stellar populations (high archival density) carry a much larger "Archival Ghost" than diffuse gas. This explains why gravitational lensing centers follow the collisionless stars rather than the dissipative plasma.
 
-The Signature: Post-Starburst (E+A) galaxies—systems with a massive starburst in their integrated history but low current luminosity—must exhibit a $1.5\text{--}2\times$ higher dark matter fraction than quiescent galaxies of equal baryonic mass.
+4. Falsifiable Prediction: The E+A Signature
 
-Testability: This is directly testable using Integral Field Unit (IFU) data from the MaNGA and SAMI surveys.
+The model's core test is the history-dependence of dark matter density.
 
-🛠 Simulation Terminal (v3.7)
+The Prediction: Post-starburst (E+A) galaxies must exhibit a $1.8 \pm 0.2 \times$ higher dark matter fraction compared to quiescent galaxies of equal baryonic mass.
 
-The repository includes research.html, a single-file WebGL physics engine and visualizer implementing the v7.6 logic.
+Verification: This is testable using Integral Field Unit (IFU) data from MaNGA and SAMI surveys.
 
-Features:
+🛠 Strategic Terminal (v3.9)
 
-Gaia DR3 Calibration: Real-time validation against local dark matter density benchmarks ($0.47 \pm 0.1 \text{ GeV/cm}^3$).
+The interactive tool research.html (WebGL-based) visualizes the Integrated Burden logic:
 
-Dynamics Engine: Visualizes the emergence of flat rotation curves from volume-law causal gradients.
+Integrated History: Toggle the "Starburst" mode to observe how past entropy events leave a permanent "Archival Ghost" in the gravitational potential, even after the star formation rate drops.
 
-E+A Falsifiability Test: Interactive toggle to simulate and observe the "Memory Burden" in post-starburst systems.
-
-Bazi/Qi Men Logic: Structural visualization of substrate scale hierarchies.
+Gaia Calibration: Real-time alignment with the latest Gaia DR3 solar neighborhood benchmarks ($8.4 \times 10^{-22} \text{ kg/m}^3$).
 
 📂 Repository Structure
 
@@ -57,28 +58,18 @@ Description
 
 formalism.md
 
-Generally covariant EFT derivation and consistency analysis (v7.6).
+The comprehensive Tensor EFT derivation and cosmological analysis (v7.8).
 
 theorem.md
 
-Mathematical proof of the Mass-Complexity Equivalence (v7.6).
+Mathematical proof of the Mass-Complexity Equivalence (v7.8).
 
 research.html
 
-Interactive Simulation Terminal (v3.7). Run in any modern browser.
+Interactive Research Terminal (v3.9).
 
 PAPER_OUTLINE.md
 
-Strategic roadmap for academic publication (JCAP/PRD).
+Roadmap for academic submission to JCAP/PRD.
 
-📊 Quantitative Verification
-
-Predicted Halo Density: $\approx 8.4 \times 10^{-22} \text{ kg/m}^3$ (Milky Way benchmark).
-
-Observed (Gaia DR3): Consistent within $1.2\sigma$.
-
-Dynamics: Naturally explains the Bullet Cluster (DM follows the collisionless stellar path) and provides a resolution to the Cusp-Core problem via interaction gradients.
-
-License: MIT / Academic Commons
-
-Technical Basis: Quantum Information Theory / String Phenomenology / Non-Equilibrium Dynamics
+Technical Context: Emergent Gravity / Memory Burden Phenomenology / String Phenomenology
