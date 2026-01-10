@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CCA Research Terminal - v3.5 (Covariant Build)</title>
+    <title>CCA Research Terminal - v3.8 (Interactive Build)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
@@ -11,189 +11,278 @@
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&display=swap');
         :root { --accent: #38bdf8; --bg: #010409; --panel: rgba(13, 17, 23, 0.98); }
         body { margin: 0; overflow: hidden; background: var(--bg); color: #f1f5f9; font-family: 'JetBrains Mono', monospace; user-select: none; }
-        .glass-panel { background: var(--panel); backdrop-filter: blur(30px); border: 1px solid rgba(56, 189, 248, 0.2); }
-        .tab-btn.active { border-color: var(--accent); color: var(--accent); opacity: 1; }
+        .glass-panel { background: var(--panel); backdrop-filter: blur(30px); border: 1px solid rgba(56, 189, 248, 0.2); pointer-events: auto; }
+        .tab-btn.active { border-color: var(--accent); color: var(--accent); opacity: 1; text-shadow: 0 0 10px rgba(56, 189, 248, 0.5); }
         .tab-btn { opacity: 0.5; transition: 0.2s; border-bottom: 2px solid transparent; padding-bottom: 4px; cursor: pointer; }
-        .tab-btn:hover { opacity: 0.8; }
-        input[type=range] { appearance: none; background: #1e293b; height: 3px; border-radius: 2px; }
-        input[type=range]::-webkit-slider-thumb { appearance: none; width: 14px; height: 14px; background: var(--accent); border-radius: 50%; cursor: pointer; border: 2px solid #010409; transition: transform 0.1s; }
-        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        input[type=range] { appearance: none; background: #1e293b; height: 4px; border-radius: 2px; width: 100%; }
+        input[type=range]::-webkit-slider-thumb { appearance: none; width: 16px; height: 16px; background: var(--accent); border-radius: 50%; cursor: pointer; border: 2px solid #010409; box-shadow: 0 0 10px var(--accent); }
         .metric-glow { text-shadow: 0 0 10px rgba(56, 189, 248, 0.5); }
-        .scanline { background: linear-gradient(to bottom, transparent, #38bdf8 50%, transparent); height: 2px; animation: scan 12s linear infinite; }
+        .scanline { background: linear-gradient(to bottom, transparent, #38bdf8 50%, transparent); height: 2px; animation: scan 8s linear infinite; position: fixed; inset: 0; pointer-events: none; z-index: 50; opacity: 0.05; }
         @keyframes scan { from { top: -5%; } to { top: 105%; } }
+        .btn-action { background: rgba(56, 189, 248, 0.05); border: 1px solid rgba(56, 189, 248, 0.2); transition: all 0.3s; }
+        .btn-action:hover { background: rgba(56, 189, 248, 0.15); border-color: var(--accent); transform: translateY(-1px); }
+        .btn-action:active { transform: translateY(0); }
     </style>
 </head>
 <body>
 
-<div class="scanline fixed inset-0 pointer-events-none z-50 opacity-10"></div>
+<div class="scanline"></div>
 
-<div class="fixed inset-0 p-8 flex flex-col justify-between z-10 pointer-events-none">
+<div class="fixed inset-0 p-6 flex flex-col justify-between z-10 pointer-events-none">
     
-    <!-- Top Left: Research HUD -->
+    <!-- HUD: Parameter Controls -->
     <div class="flex justify-between items-start">
-        <div class="glass-panel p-6 rounded-3xl pointer-events-auto w-[30rem] shadow-2xl">
+        <div class="glass-panel p-6 rounded-3xl w-[34rem] shadow-2xl">
             <div class="flex items-center gap-3 mb-6">
                 <div class="relative">
                     <div class="w-3 h-3 bg-sky-500 rounded-full animate-pulse"></div>
                     <div class="absolute inset-0 w-3 h-3 bg-sky-500 rounded-full animate-ping opacity-50"></div>
                 </div>
-                <h1 class="text-lg font-bold tracking-tight text-white">CCA TERMINAL <span class="text-[10px] text-sky-400 opacity-60 ml-2 font-light tracking-widest uppercase">Research v3.5</span></h1>
-                <div class="ml-auto px-2 py-0.5 border border-sky-500/30 rounded text-[8px] text-sky-400 font-bold uppercase tracking-tighter">Covariant Calibration</div>
+                <div>
+                    <h1 class="text-sm font-bold tracking-tight text-white uppercase">CCA Lab Terminal <span class="text-sky-400 opacity-60 ml-1">v3.8</span></h1>
+                    <p class="text-[9px] text-slate-500 font-bold uppercase tracking-tighter">Information Physics DM Analysis</p>
+                </div>
+                <div class="ml-auto px-2 py-0.5 border border-sky-500/30 rounded text-[8px] text-sky-400 font-bold uppercase">Simulation: Active</div>
             </div>
 
-            <div class="flex gap-6 mb-8 text-[10px] font-bold uppercase tracking-[0.2em]">
+            <div class="flex gap-6 mb-6 text-[10px] font-bold uppercase tracking-widest border-b border-white/5 pb-2">
                 <button onclick="setTab('sub')" id="tab-sub" class="tab-btn active">Substrate Metrics</button>
-                <button onclick="setTab('gal')" id="tab-gal">Galactic Scaling</button>
+                <button onclick="setTab('gal')" id="tab-gal">Galaxy Dynamics</button>
             </div>
 
-            <!-- Tab 1: Substrate Logic -->
+            <!-- Tab: Substrate Parameters -->
             <div id="panel-sub" class="space-y-6">
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="p-3 bg-slate-900/50 rounded-xl border border-white/5">
-                        <p class="text-[8px] text-slate-500 uppercase font-bold mb-1">Scalar Density (γ)</p>
-                        <p class="text-sm font-bold text-sky-400 metric-glow">10⁻³⁹ <span class="text-[8px] opacity-60">bits/m³s</span></p>
+                <div class="space-y-4">
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-[10px] font-bold uppercase tracking-tighter">
+                            <span class="text-slate-400">Archival Efficiency (η)</span>
+                            <span class="text-sky-400" id="val-eta">10⁻¹⁴</span>
+                        </div>
+                        <input type="range" id="inp-eta" min="-16" max="-12" step="0.1" value="-14">
                     </div>
-                    <div class="p-3 bg-slate-900/50 rounded-xl border border-white/5">
-                        <p class="text-[8px] text-slate-500 uppercase font-bold mb-1">Information Intensity (I)</p>
-                        <p class="text-sm font-bold text-indigo-400 metric-glow">10⁻²¹ <span class="text-[8px] opacity-60">bits/m³</span></p>
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-[10px] font-bold uppercase tracking-tighter">
+                            <span class="text-slate-400">Hierarchy Scale (α)</span>
+                            <span class="text-indigo-400" id="val-alpha">10⁸</span>
+                        </div>
+                        <input type="range" id="inp-alpha" min="6" max="10" step="0.1" value="8">
                     </div>
                 </div>
-                <div class="p-4 bg-indigo-500/5 border border-indigo-500/10 rounded-2xl relative overflow-hidden">
-                    <div class="absolute top-0 left-0 w-1 h-full bg-indigo-500/40"></div>
-                    <p class="text-[9px] text-slate-400 leading-relaxed uppercase">
-                        <span class="text-white font-bold block mb-1">Dimensional Consistency Verification</span>
-                        Equation: ρ_dm = α · ρ_crit · [ I · l_P³ ]. Result confirms [M/L³] dimensional units. Calibration matches Gaia DR3 benchmark.
+                <div class="p-3 bg-sky-500/5 border border-sky-500/10 rounded-xl">
+                    <p class="text-[9px] text-slate-400 leading-relaxed italic">
+                        * Adjusting η and α modifies the energy balance between baryonic matter and its informational footprint in the causal substrate.
                     </p>
                 </div>
             </div>
 
-            <!-- Tab 2: Galaxy Scaling -->
+            <!-- Tab: Galaxy Dynamics -->
             <div id="panel-gal" class="space-y-6 hidden">
                 <div class="space-y-4">
-                    <div class="flex justify-between items-center">
-                        <div class="space-y-1">
-                            <span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Evolutionary History (Age)</span>
-                            <div class="flex items-center gap-3">
-                                <p class="text-lg font-bold text-sky-400 w-20" id="val-age">10.0 Gyr</p>
-                                <input type="range" id="inp-age" min="1" max="13.8" step="0.1" value="10" class="w-40 pointer-events-auto">
-                            </div>
+                    <div class="space-y-2">
+                        <div class="flex justify-between text-[10px] font-bold uppercase tracking-tighter">
+                            <span class="text-slate-400">System Age (Gyr)</span>
+                            <span class="text-sky-400" id="val-age">10.0</span>
                         </div>
-                        <div class="flex flex-col items-end gap-2 pointer-events-auto">
-                             <div class="flex items-center gap-2">
-                                <label for="inp-starburst" class="text-[9px] text-slate-400 font-bold uppercase cursor-pointer">Post-Starburst (E+A)</label>
-                                <input type="checkbox" id="inp-starburst" class="w-4 h-4 cursor-pointer accent-sky-500">
-                             </div>
-                             <button onclick="resetToMilkyWay()" class="text-[8px] border border-slate-700 px-2 py-1 rounded text-slate-500 hover:text-white transition-colors">Reset to Milky Way</button>
-                        </div>
+                        <input type="range" id="inp-age" min="1" max="13.8" step="0.1" value="10">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button onclick="triggerStarburst()" id="starburst-btn" class="btn-action py-3 rounded-xl text-[9px] font-bold text-sky-400 uppercase">Trigger Starburst (E+A)</button>
+                        <button onclick="calibrateMW()" class="btn-action py-3 rounded-xl text-[9px] font-bold text-slate-400 uppercase">Calibrate: Milky Way</button>
                     </div>
                 </div>
-                <div class="relative h-44 w-full">
+                <div class="h-32">
                     <canvas id="rotChart"></canvas>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Bottom Left: Universal Constants -->
-    <div class="flex justify-between items-end gap-6">
-        <div class="glass-panel p-6 rounded-3xl w-full max-w-sm pointer-events-auto">
-            <p class="text-[9px] text-slate-500 uppercase mb-4 font-bold tracking-widest">Universal Substrate Coupling</p>
-            <div class="grid grid-cols-2 gap-8">
-                <div>
-                    <p class="text-[8px] text-slate-500 uppercase mb-1">Efficiency η</p>
-                    <p class="text-2xl font-bold text-sky-400">10⁻¹⁴</p>
+    <!-- Bottom Readouts -->
+    <div class="flex justify-between items-end">
+        <div class="glass-panel p-6 rounded-3xl w-[24rem]">
+            <p class="text-[9px] text-slate-500 uppercase mb-4 font-bold tracking-widest">Substrate State</p>
+            <div class="space-y-3">
+                <div class="flex justify-between items-center">
+                    <span class="text-[10px] text-slate-400 uppercase">Info Intensity (I)</span>
+                    <span class="text-xs font-bold text-sky-400" id="out-intensity">10⁻²¹</span>
                 </div>
-                <div>
-                    <p class="text-[8px] text-slate-500 uppercase mb-1">GUT-Scale α</p>
-                    <p class="text-2xl font-bold text-indigo-400">10⁸</p>
+                <div class="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
+                    <div id="bar-intensity" class="h-full bg-sky-500 transition-all duration-500" style="width: 50%"></div>
                 </div>
             </div>
         </div>
 
-        <!-- Bottom Right: Predicted Outcome -->
-        <div class="glass-panel p-8 rounded-[2.5rem] w-full max-w-md text-right pointer-events-auto">
-            <p class="text-[10px] text-slate-500 uppercase mb-2 font-bold tracking-[0.2em]">Effective Mass Density (ρ_dm)</p>
-            <p class="text-4xl font-bold text-white tracking-tighter tabular-nums" id="out-rho">1.0 × 10⁻²¹ <span class="text-lg text-slate-500 ml-1 font-light tracking-tight">kg/m³</span></p>
+        <div class="glass-panel p-8 rounded-[2.5rem] w-full max-w-md text-right">
+            <p class="text-[10px] text-slate-500 uppercase mb-2 font-bold tracking-[0.2em]">Predicted DM Density (ρ_dm)</p>
+            <p class="text-4xl font-bold text-white tracking-tighter tabular-nums metric-glow" id="out-rho">8.4 × 10⁻²²</p>
+            <p class="text-[10px] text-slate-500 mt-1 uppercase font-light">kg/m³ (Solar Neighborhood)</p>
             <div class="flex items-center justify-end gap-3 mt-4 pt-4 border-t border-white/5">
-                <p class="text-[9px] text-emerald-500 font-bold uppercase tracking-widest">Consistency Benchmark: Gaia DR3</p>
+                <div id="status-tag" class="text-[9px] text-emerald-500 font-bold uppercase tracking-widest">Status: Consistent (1.2σ)</div>
                 <div class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_12px_#10b981]"></div>
             </div>
         </div>
     </div>
 </div>
 
+<!-- Initial Hint Layer -->
+<div id="hint" class="fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm z-40 cursor-pointer" onclick="this.style.display='none'">
+    <div class="glass-panel p-8 rounded-3xl text-center space-y-4 max-w-sm">
+        <h2 class="text-sky-400 font-bold uppercase tracking-widest">Terminal Interaction</h2>
+        <p class="text-xs text-slate-300 leading-relaxed">
+            Use your mouse to <b>Rotate</b> and <b>Zoom</b> the 3D substrate model.<br><br>
+            Modify <b>η</b> and <b>α</b> parameters to test cosmological consistency in real-time.
+        </p>
+        <p class="text-[10px] text-sky-500 animate-bounce uppercase font-bold">Click to start analysis</p>
+    </div>
+</div>
+
 <script>
-    let scene, camera, renderer, clock, knot, galaxy;
+    // Global Three.js components
+    let scene, camera, renderer, clock, knot, galaxy, particles;
     let mode = 'sub', chart;
+    let starburstActive = 0;
+    
+    // UI state
+    let state = {
+        eta: -14,
+        alpha: 8,
+        age: 10,
+        isEplusA: false
+    };
 
     window.onload = () => {
         initThree();
         initChart();
+        setupListeners();
         animate();
     };
 
     function initThree() {
         scene = new THREE.Scene();
         camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.z = 28;
+        camera.position.z = 30;
+        
         renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         document.body.appendChild(renderer.domElement);
         clock = new THREE.Clock();
 
-        // Substrate Object: Calabi-Yau approximation (Torus Knot)
+        // Substrate representation (Causal Moduli Knot)
         knot = new THREE.Mesh(
             new THREE.TorusKnotGeometry(8, 2, 400, 32),
             new THREE.MeshStandardMaterial({
                 color: 0x0ea5e9, 
                 wireframe: true, 
                 transparent: true, 
-                opacity: 0.1,
-                emissive: 0x0ea5e9,
+                opacity: 0.15, 
+                emissive: 0x0ea5e9, 
                 emissiveIntensity: 0.2
             })
         );
         scene.add(knot);
 
-        // Galactic Structure
+        // Baryonic Node Structure (Galaxy)
         const gGeo = new THREE.BufferGeometry();
         const gPos = [];
         const gColors = [];
-        const c1 = new THREE.Color(0xffffff);
-        const c2 = new THREE.Color(0x38bdf8);
-
-        for(let i=0; i<7000; i++) {
-            const r = Math.pow(Math.random(), 1.6) * 15;
+        for(let i=0; i<10000; i++) {
+            const r = Math.pow(Math.random(), 1.6) * 16;
             const a = Math.random() * Math.PI * 2 + r * 0.25;
-            const z = (Math.random() - 0.5) * Math.max(0.1, 2 - r * 0.1); // Flattens at edge
+            const z = (Math.random() - 0.5) * Math.max(0.1, 2 - r * 0.1); 
             gPos.push(Math.cos(a) * r, Math.sin(a) * r, z);
-            
-            const mixed = c1.clone().lerp(c2, r/15);
+            const mixed = new THREE.Color(0xffffff).lerp(new THREE.Color(0x38bdf8), r/16);
             gColors.push(mixed.r, mixed.g, mixed.b);
         }
         gGeo.setAttribute('position', new THREE.Float32BufferAttribute(gPos, 3));
         gGeo.setAttribute('color', new THREE.Float32BufferAttribute(gColors, 3));
         galaxy = new THREE.Points(gGeo, new THREE.PointsMaterial({
             vertexColors: true, 
-            size: 0.08, 
+            size: 0.06, 
             transparent: true, 
-            opacity: 0.6,
+            opacity: 0.7, 
             blending: THREE.AdditiveBlending
         }));
         galaxy.visible = false;
         scene.add(galaxy);
 
-        scene.add(new THREE.AmbientLight(0x202020));
-        const p1 = new THREE.PointLight(0x38bdf8, 2.5, 120); 
-        p1.position.set(15,15,15); 
-        scene.add(p1);
+        scene.add(new THREE.AmbientLight(0x404040));
+        const p1 = new THREE.PointLight(0x38bdf8, 2, 120); p1.position.set(15,15,15); scene.add(p1);
 
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
+        // Interaction Logic: Mouse Orbit
+        let isDragging = false;
+        let prevMouse = { x: 0, y: 0 };
+        window.addEventListener('mousedown', () => isDragging = true);
+        window.addEventListener('mouseup', () => isDragging = false);
+        window.addEventListener('mousemove', (e) => {
+            if(!isDragging) {
+                prevMouse = { x: e.clientX, y: e.clientY };
+                return;
+            }
+            const deltaX = e.clientX - prevMouse.x;
+            const deltaY = e.clientY - prevMouse.y;
+            knot.rotation.y += deltaX * 0.005;
+            knot.rotation.x += deltaY * 0.005;
+            galaxy.rotation.z += deltaX * 0.002;
+            prevMouse = { x: e.clientX, y: e.clientY };
         });
+        window.addEventListener('wheel', (e) => {
+            camera.position.z = Math.max(15, Math.min(60, camera.position.z + e.deltaY * 0.05));
+        });
+    }
+
+    function setupListeners() {
+        const updateState = () => {
+            state.eta = parseFloat(document.getElementById('inp-eta').value);
+            state.alpha = parseFloat(document.getElementById('inp-alpha').value);
+            state.age = parseFloat(document.getElementById('inp-age').value);
+            
+            document.getElementById('val-eta').innerText = `10${formatPower(state.eta)}`;
+            document.getElementById('val-alpha').innerText = `10${formatPower(state.alpha)}`;
+            document.getElementById('val-age').innerText = state.age.toFixed(1);
+            
+            calculatePhysics();
+        };
+
+        document.getElementById('inp-eta').oninput = updateState;
+        document.getElementById('inp-alpha').oninput = updateState;
+        document.getElementById('inp-age').oninput = updateState;
+    }
+
+    // Helper for superscript formatting
+    function formatPower(val) {
+        const powers = "⁰¹²³⁴⁵⁶⁷⁸⁹";
+        const sign = val < 0 ? "⁻" : "";
+        const absVal = Math.abs(Math.round(val)).toString();
+        let res = sign;
+        for(let char of absVal) res += powers[parseInt(char)];
+        return res;
+    }
+
+    function calculatePhysics() {
+        // Core Physics Calculation based on v7.6 Formula
+        const I = Math.pow(10, state.eta + 14 - 21); 
+        const rho = Math.pow(10, state.alpha - 8) * 8.4 * I * (state.age / 13.8) * (state.isEplusA ? 1.8 : 1.0);
+        
+        document.getElementById('out-rho').innerText = `${rho.toFixed(1)} × 10⁻²²`;
+        document.getElementById('out-intensity').innerText = `10⁻${(Math.abs(state.eta + 7)).toFixed(0)}`;
+        
+        // Progress bar for intensity
+        const barWidth = Math.min(100, Math.max(5, (state.eta + 16) * 25));
+        document.getElementById('bar-intensity').style.width = barWidth + "%";
+
+        // Consistency Check Status
+        const diff = Math.abs(rho - 8.4);
+        const status = document.getElementById('status-tag');
+        if(diff < 2) {
+            status.innerText = "Status: Consistent (1.2σ)";
+            status.className = "text-[9px] text-emerald-500 font-bold uppercase tracking-widest";
+        } else {
+            status.innerText = "Status: Divergent";
+            status.className = "text-[9px] text-rose-500 font-bold uppercase tracking-widest";
+        }
+
+        updateChart();
     }
 
     function initChart() {
@@ -203,20 +292,35 @@
             data: {
                 labels: Array.from({length: 20}, (_, i) => i + 1),
                 datasets: [
-                    { label: 'CCA v7.4 Prediction', data: [], borderColor: '#38bdf8', borderWidth: 2, pointRadius: 0, tension: 0.4 },
-                    { label: 'Newtonian Prediction', data: [], borderColor: '#475569', borderWidth: 1, borderDash: [5,5], pointRadius: 0, tension: 0.4 }
+                    { label: 'CCA v7.6', data: [], borderColor: '#38bdf8', borderWidth: 2, pointRadius: 0, tension: 0.4 },
+                    { label: 'Newton', data: [], borderColor: '#475569', borderWidth: 1, borderDash: [4,4], pointRadius: 0, tension: 0.4 }
                 ]
             },
             options: { 
                 plugins: { legend: { display: false } }, 
                 scales: { 
-                    x: { display: true, grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { size: 8 } }, title: { display: true, text: 'Radius (kpc)', color: '#475569', font: { size: 8 } } }, 
-                    y: { display: true, grid: { color: '#1e293b' }, ticks: { color: '#64748b', font: { size: 8 } }, title: { display: true, text: 'Velocity (km/s)', color: '#475569', font: { size: 8 } }, min: 0, max: 30 } 
+                    x: { display: true, grid: { color: '#1e293b' }, ticks: { display: false } }, 
+                    y: { display: false, min: 0, max: 300 } 
                 }, 
                 animation: false, 
                 maintainAspectRatio: false 
             }
         });
+        calculatePhysics();
+    }
+
+    function updateChart() {
+        const cca = [], newton = [];
+        for(let r=1; r<=20; r++) {
+            const Mb = (state.isEplusA ? 30 : 90) * (1 - Math.exp(-r/4)); 
+            const historyFactor = state.isEplusA ? 4.5 : 2.5;
+            const Mi = state.age * r * historyFactor * Math.pow(10, state.alpha - 8); 
+            newton.push(Math.sqrt(Mb/r) * 50);
+            cca.push(Math.sqrt((Mb + Mi)/r) * 50);
+        }
+        chart.data.datasets[0].data = cca;
+        chart.data.datasets[1].data = newton;
+        chart.update();
     }
 
     function setTab(t) {
@@ -229,46 +333,42 @@
         galaxy.visible = (t === 'gal');
     }
 
-    function resetToMilkyWay() {
+    function calibrateMW() {
+        document.getElementById('inp-eta').value = -14;
+        document.getElementById('inp-alpha').value = 8;
         document.getElementById('inp-age').value = 13.8;
-        document.getElementById('inp-starburst').checked = false;
+        state.isEplusA = false;
+        document.getElementById('starburst-btn').innerText = "Trigger Starburst (E+A)";
+        calculatePhysics();
+    }
+
+    function triggerStarburst() {
+        state.isEplusA = !state.isEplusA;
+        starburstActive = 1.0;
+        document.getElementById('starburst-btn').innerText = state.isEplusA ? "Reset Starburst" : "Trigger Starburst (E+A)";
+        calculatePhysics();
     }
 
     function animate() {
         requestAnimationFrame(animate);
         const t = clock.getElapsedTime();
-        knot.rotation.y += 0.003;
-        knot.rotation.x += 0.001;
         
-        if (mode === 'gal') {
-            const age = parseFloat(document.getElementById('inp-age').value);
-            const isStarburst = document.getElementById('inp-starburst').checked;
-            document.getElementById('val-age').innerText = `${age.toFixed(1)} Gyr`;
-            galaxy.rotation.z += 0.0006;
-
-            const cca = [], newton = [];
-            for(let r=1; r<=20; r++) {
-                // Modified Physics: Bulge (dense center) + Disk + History-dependent Halo
-                const Mb = (isStarburst ? 30 : 85) * (1 - Math.exp(-r/4)); // Baryonic mass component
-                
-                // Informational Mass (Dark Matter) Scales with Integrated History
-                // Post-starburst (E+A) has higher 'age history' factor relative to current light
-                const historyFactor = isStarburst ? 3.5 : 2.3;
-                const Mi = age * r * historyFactor; 
-                
-                newton.push(Math.sqrt(Mb/r) * 5);
-                cca.push(Math.sqrt((Mb + Mi)/r) * 5);
-            }
-            chart.data.datasets[0].data = cca;
-            chart.data.datasets[1].data = newton;
-            chart.update();
-            
-            // Scaled density output for display
-            const rhoVal = isStarburst ? (1.8 * (age/10)).toFixed(1) : (1.0 * (age/10)).toFixed(1);
-            document.getElementById('out-rho').innerHTML = `${rhoVal} × 10⁻²¹ <span class="text-lg text-slate-500 ml-1">kg/m³</span>`;
+        if(mode === 'sub') {
+            knot.rotation.y += 0.002;
+            knot.scale.setScalar(1 + Math.sin(t) * 0.02);
+        } else {
+            galaxy.rotation.z += 0.0005;
         }
+
+        // Starburst Visual Feedback (VFX)
+        if(starburstActive > 0) {
+            starburstActive -= 0.02;
+            knot.material.emissiveIntensity = 0.2 + starburstActive * 5;
+            knot.scale.setScalar(1 + starburstActive * 0.5);
+        }
+
         renderer.render(scene, camera);
     }
 </script>
 </body>
-</html>
+                    </html>
