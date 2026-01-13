@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Дифузійна Лабораторія: CCA vs Arrhenius</title>
+    <!-- Підключення бібліотек -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
+        .slider-thumb::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            background: #2563eb;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+        .chart-container { position: relative; height: 450px; width: 100%; }
+    </style>
+</head>
+<body class="antialiased text-slate-900">
+    <div class="max-w-7xl mx-auto py-8 px-4">
+        <!-- Заголовок -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 mb-8">
+            <h1 class="text-3xl font-bold text-slate-900 tracking-tight">Дослідження динамічної супресії дифузії</h1>
+            <p class="text-slate-500 mt-2 max-w-3xl">
+                Цей інструмент порівнює класичну модель Арреніуса-Вайнярда та гіпотезу дискретного дефазування (CCA). 
+                Він демонструє відхилення коефіцієнта дифузії при наближенні частоти спроб до дебаївського порогу.
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-4 gap-8">
+            <!-- Панель керування -->
+            <div class="xl:col-span-1 space-y-6">
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                    <h2 class="text-lg font-bold mb-6 flex items-center">
+                        <span class="w-2 h-6 bg-blue-600 rounded mr-3"></span>
+                        Параметри моделі
+                    </h2>
+                    
+                    <!-- Ea -->
+                    <div class="mb-8">
+                        <div class="flex justify-between text-sm mb-2">
+                            <span class="font-semibold text-slate-700">E<sub>a</sub> (Енергія активації)</span>
+                            <span id="eaDisp" class="text-blue-600 font-bold px-2 py-1 bg-blue-50 rounded">0.70 eV</span>
+                        </div>
+                        <input type="range" id="ea" min="0.2" max="1.5" step="0.01" value="0.70" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer slider-thumb">
+                    </div>
+
+                    <!-- Nu0 -->
+                    <div class="mb-8">
+                        <div class="flex justify-between text-sm mb-2">
+                            <span class="font-semibold text-slate-700">&nu;<sub>0</sub> (Частота спроб)</span>
+                            <span id="nuDisp" class="text-blue-600 font-bold px-2 py-1 bg-blue-50 rounded">10¹³ Hz</span>
+                        </div>
+                        <input type="range" id="nu0" min="11" max="14" step="0.1" value="13" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer slider-thumb">
+                    </div>
+
+                    <!-- OmegaC -->
+                    <div class="mb-8">
+                        <div class="flex justify-between text-sm mb-2">
+                            <span class="font-semibold text-slate-700">&Omega;<sub>c</sub> (Поріг супресії)</span>
+                            <span id="ocDisp" class="text-red-600 font-bold px-2 py-1 bg-red-50 rounded">0.50 THz</span>
+                        </div>
+                        <input type="range" id="oc" min="0.1" max="3.0" step="0.05" value="0.50" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer slider-thumb">
+                    </div>
+
+                    <div class="p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-3">
+                        <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Математичний апарат</h4>
+                        <div class="text-[11px] text-slate-600 font-mono">
+                            D<sub>classic</sub> = &nu;<sub>0</sub> e<sup>-E<sub>a</sub>/kT</sup><br>
+                            D<sub>cca</sub> = D<sub>classic</sub> e<sup>-&nu;<sub>thermal</sub>/&Omega;<sub>c</sub></sup>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Область графіка -->
+            <div class="xl:col-span-3">
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 h-full">
+                    <div class="chart-container">
+                        <canvas id="diffusionChart"></canvas>
+                    </div>
+                    <div class="flex justify-center mt-6 space-x-8 text-sm">
+                        <div class="flex items-center">
+                            <span class="w-3 h-3 rounded-full bg-red-500 mr-2"></span>
+                            <span class="text-slate-600">CCA Модель</span>
+                        </div>
+                        <div class="flex items-center border-l border-slate-200 pl-8">
+                            <span class="w-3 h-0.5 bg-slate-400 mr-2 border-t-2 border-dashed"></span>
+                            <span class="text-slate-600">Класичний Арреніус</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Пояснення -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mt-8">
+            <div class="bg-white p-6 rounded-2xl border border-slate-200">
+                <h3 class="font-bold text-slate-800 mb-3 flex items-center">
+                    <svg class="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    Суть явища
+                </h3>
+                <p class="text-sm text-slate-600 leading-relaxed">
+                    На відміну від класичної моделі, де дифузія росте експоненційно, CCA передбачає "динамічний опір". Коли частота успішних термічних спроб наближається до &Omega;<sub>c</sub>, система втрачає когерентність.
+                </p>
+            </div>
+            <div class="bg-white p-6 rounded-2xl border border-slate-200">
+                <h3 class="font-bold text-slate-800 mb-3 flex items-center">
+                    <svg class="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.618.309a6 6 0 01-4.708.394l-2.386-.795a2 2 0 00-1.032.064l-1.615.646c-.757.303-1.144 1.145-.841 1.902l.628 1.571a2 2 0 00.928 1.056l1.108.554a2 2 0 001.789 0l.144-.072a4 4 0 014.172 0l.144.072a2 2 0 001.789 0l1.109-.554a2 2 0 00.928-1.056l.628-1.571c.303-.757-.084-1.599-.841-1.902l-1.615-.646z"></path></svg>
+                    Архейський щит
+                </h3>
+                <p class="text-sm text-slate-600 leading-relaxed">
+                    Граніти Українського щита — ідеальний об'єкт для пошуку цього ефекту. Їхня стабільність дозволяє виявити фундаментальні відхилення, які зазвичай маскуються дефектами в сучасних кристалах.
+                </p>
+            </div>
+            <div class="bg-white p-6 rounded-2xl border border-slate-200">
+                <h3 class="font-bold text-slate-800 mb-3 flex items-center">
+                    <svg class="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                    QENS Аналіз
+                </h3>
+                <p class="text-sm text-slate-600 leading-relaxed">
+                    Квазіпружне розсіювання нейтронів дозволяє зафіксувати розширення ліній спектру, що прямо свідчить про часові обмеження дифузії в пікосекундному діапазоні.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const kB = 8.617333e-5;
+        let diffusionChart;
+
+        function updateUI() {
+            const ea = document.getElementById('ea').value;
+            const nu0 = document.getElementById('nu0').value;
+            const oc = document.getElementById('oc').value;
+
+            document.getElementById('eaDisp').innerText = `${parseFloat(ea).toFixed(2)} eV`;
+            document.getElementById('nuDisp').innerText = `10^${nu0} Hz`;
+            document.getElementById('ocDisp').innerText = `${parseFloat(oc).toFixed(2)} THz`;
+        }
+
+        function calculateData() {
+            const ea = parseFloat(document.getElementById('ea').value);
+            const nu0 = Math.pow(10, parseFloat(document.getElementById('nu0').value));
+            const oc = parseFloat(document.getElementById('oc').value) * 1e12;
+
+            const labels = [];
+            const arrheniusPoints = [];
+            const ccaPoints = [];
+
+            // Діапазон температур від 300 до 2200 К
+            for (let t = 2200; t >= 300; t -= 40) {
+                const invT = 1000 / t;
+                labels.push(invT.toFixed(2));
+
+                // Класична частота стрибків
+                const D_classic = nu0 * Math.exp(-ea / (kB * t));
+                
+                // Модель CCA: фактор kappa
+                const v_thermal = nu0 * Math.exp(-ea / (kB * t));
+                const kappa = Math.exp(-v_thermal / oc);
+                const D_cca = D_classic * kappa;
+
+                // Використовуємо log10 для вертикальної осі (Arrhenius Plot)
+                arrheniusPoints.push(Math.log10(D_classic));
+                ccaPoints.push(Math.log10(D_cca));
+            }
+
+            return { labels, arrheniusPoints, ccaPoints };
+        }
+
+        function initChart() {
+            const data = calculateData();
+            const ctx = document.getElementById('diffusionChart').getContext('2d');
+
+            diffusionChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.labels,
+                    datasets: [
+                        {
+                            label: 'CCA (Супресія)',
+                            data: data.ccaPoints,
+                            borderColor: '#ef4444',
+                            borderWidth: 3,
+                            pointRadius: 0,
+                            pointHitRadius: 10,
+                            tension: 0.1
+                        },
+                        {
+                            label: 'Класичний Арреніус',
+                            data: data.arrheniusPoints,
+                            borderColor: '#94a3b8',
+                            borderWidth: 2,
+                            borderDash: [6, 4],
+                            pointRadius: 0,
+                            tension: 0.1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.dataset.label}: ${context.parsed.y.toFixed(2)} [log10(D)]`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: { display: true, text: '1000 / T (K⁻¹)', font: { weight: 'bold' } },
+                            grid: { display: false }
+                        },
+                        y: {
+                            title: { display: true, text: 'Log10 (Коефіцієнт дифузії D)', font: { weight: 'bold' } },
+                            grid: { color: '#f1f5f9' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function refresh() {
+            updateUI();
+            const data = calculateData();
+            diffusionChart.data.labels = data.labels;
+            diffusionChart.data.datasets[0].data = data.ccaPoints;
+            diffusionChart.data.datasets[1].data = data.arrheniusPoints;
+            diffusionChart.update('none'); // Оновлення без анімації для кращого відгуку
+        }
+
+        // Слухачі подій
+        document.querySelectorAll('input').forEach(input => {
+            input.addEventListener('input', refresh);
+        });
+
+        // Старт
+        window.onload = () => {
+            initChart();
+            updateUI();
+        };
+    </script>
+</body>
+</html>
