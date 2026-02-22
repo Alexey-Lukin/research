@@ -12,7 +12,7 @@
 #include "main.h"
 
 /* USER CODE BEGIN Includes */
-// Підключаємо віртуальну машину mruby для розрахунку Атрактора Лоренца
+// Флюси для плавки: Підключаємо віртуальну машину mruby
 #include <mruby.h>
 #include <mruby/irep.h>
 #include <mruby/array.h>
@@ -93,7 +93,7 @@ int main(void)
   MX_SUBGHZ_Init();
 
   /* USER CODE BEGIN 2 */
-  // Фіксуємо початковий час при першому старті
+  // Фіксуємо початковий час при першому старті (Точка 0)
   last_wakeup_timestamp = HAL_GetTick() / 1000;
   /* USER CODE END 2 */
 
@@ -121,7 +121,7 @@ int main(void)
     if (HAL_ADC_PollForConversion(&hadc, 10) == HAL_OK) {
         vcap_voltage = HAL_ADC_GetValue(&hadc); // Канал VREFINT (іоністор)
     }
-    HAL_ADC_Stop(&hadc); 
+    HAL_ADC_Stop(&hadc); // Миттєво вимикаємо АЦП
 
     // 3. Квантовий Хаос (Зерно для Атрактора)
     uint32_t chaos_seed = 0;
@@ -162,7 +162,7 @@ int main(void)
       // Формуємо аргументи: [Квантовий Шум, Температура, Акустика]
       mrb_value args[3];
       args[0] = mrb_fixnum_value(chaos_seed);
-      args[1] = mrb_fixnum_value(lora_payload[2]); // Вже конвертована температура
+      args[1] = mrb_fixnum_value(lora_payload[2]); // Температура
       args[2] = mrb_fixnum_value(lora_payload[3]); // Кількість подій
 
       // Викликаємо метод calculate_state
@@ -179,16 +179,15 @@ int main(void)
     }
 
     // =========================================================================
-    // ФАЗА 4: ПЕРЕДАЧА ДАНИХ
+    // ФАЗА 4: ПЕРЕДАЧА ДАНИХ (LoRaWAN)
     // =========================================================================
-    // Тут викликається функція відправки масиву lora_payload[7] через LoRa
-    // (наприклад: LORA_SendPayload(lora_payload, 7);)
+    // Тут буде функція передачі payload через стек LoRaWAN.
+    // Наприклад: LORA_SendPayload(lora_payload, 7);
 
     // =========================================================================
     // ФАЗА 5: КЕНОЗИС (Абсолютний сон)
     // =========================================================================
-    // Відключаємо тактування і падаємо в режим глибокого збереження енергії.
-    // Процесор стоїть на цьому рядку, поки переривання не розбудить його.
+    // Listen for the whisper. Відключаємо ядро і чекаємо.
     HAL_SuspendTick();
     HAL_PWREx_EnterSTOP2Mode(PWR_STOPENTRY_WFI);
     HAL_ResumeTick();
@@ -205,16 +204,28 @@ int main(void)
 // =========================================================================
 // АПАРАТНИЙ РЕФЛЕКС (Голос Дерева)
 // =========================================================================
-// Ця функція викликається автоматично мікроконтролером, коли п'єзодиск 
-// генерує імпульс від кавітації або удару (навіть коли ядро спить).
+// Викликається апаратно, коли п'єзодиск генерує імпульс (PA0).
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
   if(GPIO_Pin == GPIO_PIN_0) 
   {
-    acoustic_events++; // Збільшуємо ентропію системи на 1
+    acoustic_events++; // Фіксуємо ентропію без пробудження головного циклу
   }
 }
 
 /* USER CODE END 4 */
 
-// ... [Автозгенерований код обробки помилок та HAL] ...
+/**
+  * @brief  This function is executed in case of error occurrence.
+  * @retval None
+  */
+void Error_Handler(void)
+{
+  /* USER CODE BEGIN Error_Handler_Debug */
+  /* User can add his own implementation to report the HAL error return state */
+  __disable_irq();
+  while (1)
+  {
+  }
+  /* USER CODE END Error_Handler_Debug */
+}
