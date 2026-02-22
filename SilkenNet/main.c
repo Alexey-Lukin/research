@@ -2,7 +2,7 @@
 /**
   ******************************************************************************
   * @file           : main.c
-  * @brief          : Прошивка вузла Silken Net (Стан Нульового Лагу + TinyML)
+  * @brief          : Прошивка вузла Silken Net (Стан Нульового Лагу + TinyML + Кенозис)
   * @processor      : STM32WLE5JC
   ******************************************************************************
   */
@@ -35,6 +35,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc;
+IWDG_HandleTypeDef hiwdg; // Додано: Апаратний сторожовий пес
 RNG_HandleTypeDef hrng;
 RTC_HandleTypeDef hrtc;
 SUBGHZ_HandleTypeDef hsubghz;
@@ -70,6 +71,7 @@ const uint8_t lorenz_bytecode[] = {
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_ADC_Init(void);
+static void MX_IWDG_Init(void); // Додано: Ініціалізація IWDG
 static void MX_RNG_Init(void);
 static void MX_RTC_Init(void);
 static void MX_SUBGHZ_Init(void);
@@ -100,19 +102,39 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_ADC_Init();
+  MX_IWDG_Init(); // Ініціалізуємо Сторожового Пса
   MX_RNG_Init();
   MX_RTC_Init();
   MX_SUBGHZ_Init();
 
   /* USER CODE BEGIN 2 */
-  // Фіксуємо початковий час при першому старті (Точка 0)
-  last_wakeup_timestamp = HAL_GetTick() / 1000;
+  // 1. Відкриваємо доступ до Backup Domain (дозволяємо запис у вічну пам'ять)
+  HAL_PWR_EnableBkUpAccess();
+
+  // 2. Відновлюємо пам'ять з RTC (якщо було перезавантаження)
+  acoustic_events = (uint16_t)HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR0);
+  last_wakeup_timestamp = HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR1);
+
+  // Якщо це найперший старт в житті анкера (пам'ять порожня)
+  if (last_wakeup_timestamp == 0) {
+      last_wakeup_timestamp = HAL_GetTick() / 1000;
+  }
+
+  // 3. Калібрування АЦП (Встановлюємо абсолютний фізичний нуль)
+  HAL_ADCEx_Calibration_Start(&hadc);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    // =========================================================================
+    // ФАЗА 0: СИГНАЛ ЖИТТЯ (IWDG)
+    // =========================================================================
+    // Гладимо Сторожового Пса. Якщо ядро зависне і не виконає цю команду,
+    // система автоматично перезавантажиться і відновить дані з RTC.
+    HAL_IWDG_Refresh(&hiwdg);
+
     // =========================================================================
     // ФАЗА 1: ЗБІР ФІЗИЧНИХ ДАНИХ (Нульова ентропія)
     // =========================================================================
@@ -224,8 +246,12 @@ int main(void)
     // Наприклад: LORA_SendPayload(lora_payload, 7);
 
     // =========================================================================
-    // ФАЗА 5: КЕНОЗИС (Абсолютний сон)
+    // ФАЗА 5: КЕНОЗИС (Абсолютний сон та збереження)
     // =========================================================================
+    // Ховаємо життєво важливі дані в RTC перед вимкненням оперативної пам'яті
+    HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR0, acoustic_events);
+    HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR1, last_wakeup_timestamp);
+
     // Listen for the whisper. Відключаємо ядро і чекаємо.
     HAL_SuspendTick();
     HAL_PWREx_EnterSTOP2Mode(PWR_STOPENTRY_WFI);
