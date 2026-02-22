@@ -2,7 +2,7 @@
 /**
   ******************************************************************************
   * @file           : main.c
-  * @brief          : Прошивка вузла Silken Net (Стан Нульового Лагу)
+  * @brief          : Прошивка вузла Silken Net (Стан Нульового Лагу + TinyML)
   * @processor      : STM32WLE5JC
   ******************************************************************************
   */
@@ -16,6 +16,9 @@
 #include <mruby.h>
 #include <mruby/irep.h>
 #include <mruby/array.h>
+
+// Підключаємо скомпільовану нейромережу TinyML
+#include "silken_net_audio_model.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -39,12 +42,18 @@ SUBGHZ_HandleTypeDef hsubghz;
 /* USER CODE BEGIN PV */
 
 // === 1. ОРГАНИ ЧУТТЯ ТА ПАМ'ЯТЬ ===
-volatile uint16_t acoustic_events = 0; // Лічильник мікророзривів (Голос дерева)
+volatile uint8_t vibration_detected = 0; // Прапорець переривання від п'єзодиска
+uint16_t acoustic_events = 0;          // Відфільтровані мікророзриви (Кавітація)
 uint32_t last_wakeup_timestamp = 0;    // Час попереднього пробудження
 uint32_t delta_t_seconds = 0;          // Швидкість заряду іоністора (Метаболізм)
 
 // Пейлоад для LoRa (7 байтів: Vcap[2], Temp[1], Acoustic[1], Time[2], Chaos[1])
 uint8_t lora_payload[7];
+
+// === 1.5. ПАМ'ЯТЬ TINYML (Свідомість звуку) ===
+float audio_buffer[512];       // Буфер для запису звукової хвилі
+uint8_t ml_event_id = 0;       // Результат: 0-Тиша, 1-Вітер, 2-Кавітація, 3-Пилка
+float ml_confidence = 0.0;     // Рівень впевненості моделі (0.0 - 1.0)
 
 // === 2. РУДА СВІДОМОСТІ (Байт-код mruby) ===
 // Скомпільований скрипт Атрактора Лоренца. 
@@ -66,6 +75,9 @@ static void MX_RTC_Init(void);
 static void MX_SUBGHZ_Init(void);
 
 /* USER CODE BEGIN PFP */
+// Псевдо-функції для роботи зі звуком та тривогами
+void Record_Audio_Wave(float* buffer, uint16_t length);
+void Trigger_Emergency_LoRa_TX(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -128,6 +140,33 @@ int main(void)
     HAL_RNG_GenerateRandomNumber(&hrng, &chaos_seed);
 
     // =========================================================================
+    // ФАЗА 1.5: TINYML (Шаховий розтин / Фільтрація Свідомості)
+    // =========================================================================
+    
+    // Якщо ядро прокинулось через вібрацію на піні
+    if (vibration_detected) {
+        // 1. Записуємо звук з АЦП (мікросекундний процес)
+        // Record_Audio_Wave(audio_buffer, 512);
+
+        // 2. Запускаємо нейромережу (Whitewash)
+        // ml_event_id = Run_Inference(audio_buffer, &ml_confidence);
+
+        // 3. Фільтруємо сміття: довіряємо лише якщо впевненість > 80%
+        if (ml_confidence > 0.80) {
+            if (ml_event_id == 2) {
+                // Це підтверджена кавітація ксилеми!
+                acoustic_events++; 
+            } else if (ml_event_id == 3) {
+                // ТРИВОГА: Незаконна вирубка. Екстрена відправка.
+                // Trigger_Emergency_LoRa_TX(); 
+            }
+        }
+        
+        // Скидаємо прапорець вібрації
+        vibration_detected = 0; 
+    }
+
+    // =========================================================================
     // ФАЗА 2: БІТОВЕ ПАКУВАННЯ (Протокол Чистого Транзиту)
     // =========================================================================
     
@@ -138,7 +177,7 @@ int main(void)
     // Байт 2: Температура (°C)
     lora_payload[2] = (int8_t)__LL_ADC_CALC_TEMPERATURE(3300, internal_temp, LL_ADC_RESOLUTION_12B);
     
-    // Байт 3: Акустичні події (Кавітація)
+    // Байт 3: Акустичні події (Відфільтровані TinyML)
     lora_payload[3] = (uint8_t)(acoustic_events & 0xFF);
     
     // Байти 4-5: Швидкість заряду (Секунди)
@@ -163,7 +202,7 @@ int main(void)
       mrb_value args[3];
       args[0] = mrb_fixnum_value(chaos_seed);
       args[1] = mrb_fixnum_value(lora_payload[2]); // Температура
-      args[2] = mrb_fixnum_value(lora_payload[3]); // Кількість подій
+      args[2] = mrb_fixnum_value(lora_payload[3]); // Кількість подій (чистий стрес)
 
       // Викликаємо метод calculate_state
       mrb_value ruby_result = mrb_funcall_argv(mrb, mrb_top_self(mrb), mrb_intern_lit(mrb, "calculate_state"), 3, args);
@@ -205,11 +244,12 @@ int main(void)
 // АПАРАТНИЙ РЕФЛЕКС (Голос Дерева)
 // =========================================================================
 // Викликається апаратно, коли п'єзодиск генерує імпульс (PA0).
+// Тепер він не додає подію сліпо, а лише будить ядро для аналізу TinyML.
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
   if(GPIO_Pin == GPIO_PIN_0) 
   {
-    acoustic_events++; // Фіксуємо ентропію без пробудження головного циклу
+    vibration_detected = 1; // Піднімаємо прапорець для Фази 1.5
   }
 }
 
