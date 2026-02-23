@@ -10,8 +10,9 @@ module SilkenNet
     BASE_RHO   = 28.0
     BASE_BETA  = 2.666 # 8.0 / 3.0
     
-    # Крок інтегрування
+    # Крок інтегрування та глибина симуляції
     DT = 0.01
+    ITERATIONS = 250 # Даємо системі час вийти на траєкторію хаосу
 
     def self.calculate_z_axis(seed, temp, acoustic)
       x = ((seed % 1000) / 500.0) - 1.0
@@ -22,7 +23,7 @@ module SilkenNet
       local_sigma = BASE_SIGMA + (acoustic * 0.1)
       local_rho = BASE_RHO + (temp * 0.2)
 
-      10.times do
+      ITERATIONS.times do
         dx = local_sigma * (y - x)
         dy = x * (local_rho - z) - y
         dz = (x * y) - (BASE_BETA * z)
