@@ -29,6 +29,7 @@
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
+#define MRUBY_CONTRACT_FLASH_ADDR 0x0803F000 // Адреса для OTA оновлень
 /* USER CODE BEGIN PD */
 /* USER CODE END PD */
 
@@ -59,6 +60,22 @@ float audio_buffer[512];       // Буфер для запису звуково�
 uint8_t ml_event_id = 0;       // Результат: 0-Тиша, 1-Вітер, 2-Кавітація, 3-Пилка
 float ml_confidence = 0.0;     // Рівень впевненості моделі (0.0 - 1.0)
 
+// === 1.8. ПАМ'ЯТЬ ЕСТАФЕТИ (Mesh Relay) ТА OTA ===
+uint8_t mesh_relay_payload[7]; // Буфер для чужого пакета
+uint8_t has_mesh_relay = 0;    // Прапорець: 1 - є пакет для ретрансляції
+
+volatile uint8_t lora_rx_flag = 0;
+uint8_t incoming_lora_payload[255]; 
+uint16_t incoming_lora_size = 0;
+
+// Буфер для збирання байт-коду по шматочках (OTA)
+uint8_t ota_buffer[1024];
+uint16_t ota_bytes_received = 0;
+uint8_t ota_total_chunks = 0;
+uint8_t ota_chunks_received = 0;
+
+uint8_t* current_lorenz_bytecode;
+
 // === 2. РУДА СВІДОМОСТІ (Байт-код mruby) ===
 // Скомпільований скрипт Атрактора Лоренца. 
 // Цей масив генерується на Mac командою mrbc.
@@ -83,6 +100,7 @@ static void MX_SUBGHZ_Init(void);
 // Псевдо-функції для роботи зі звуком та тривогами
 void Record_Audio_Wave(float* buffer, uint16_t length);
 void Trigger_Emergency_LoRa_TX(void);
+void Write_OTA_Contract_To_Flash(uint8_t* data, uint16_t size);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -117,6 +135,17 @@ int main(void)
   // 2. Відновлюємо пам'ять з RTC (якщо було перезавантаження)
   acoustic_events = (uint16_t)HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR0);
   last_wakeup_timestamp = HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR1);
+  has_mesh_relay = (uint8_t)HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR2); // Відновлюємо прапорець естафети
+  
+  // Відновлюємо транзитний пакет з Backup-регістрів, якщо він там був
+  if (has_mesh_relay) {
+      uint32_t reg3 = HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR3);
+      uint32_t reg4 = HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR4);
+      mesh_relay_payload[0] = (reg3 >> 24) & 0xFF; mesh_relay_payload[1] = (reg3 >> 16) & 0xFF;
+      mesh_relay_payload[2] = (reg3 >> 8) & 0xFF;  mesh_relay_payload[3] = reg3 & 0xFF;
+      mesh_relay_payload[4] = (reg4 >> 16) & 0xFF; mesh_relay_payload[5] = (reg4 >> 8) & 0xFF;
+      mesh_relay_payload[6] = reg4 & 0xFF;
+  }
 
   // Якщо це найперший старт в житті анкера (пам'ять порожня)
   if (last_wakeup_timestamp == 0) {
@@ -129,6 +158,14 @@ int main(void)
   // ДОДАНО: 4. Ініціалізація низькорівневого радіодрайвера
   Radio.Init(NULL); // Передаємо NULL, бо ми не використовуємо складні колбеки
   Radio.SetChannel(868000000); // Налаштовуємо на 868 МГц
+
+  // 5. Вибір контракту: Перевіряємо, чи є в Flash-пам'яті оновлений код
+  uint32_t* flash_check = (uint32_t*)MRUBY_CONTRACT_FLASH_ADDR;
+  if (*flash_check == 0x45544952) { // "RITE" у little-endian (ознака mruby байткоду)
+      current_lorenz_bytecode = (uint8_t*)MRUBY_CONTRACT_FLASH_ADDR; 
+  } else {
+      current_lorenz_bytecode = (uint8_t*)lorenz_bytecode; 
+  }
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -225,7 +262,7 @@ int main(void)
 
     if (mrb) {
       // Завантажуємо байт-код Атрактора
-      mrb_load_irep(mrb, lorenz_bytecode);
+      mrb_load_irep(mrb, current_lorenz_bytecode);
 
       // Формуємо аргументи: [Квантовий Шум, Температура, Акустика]
       mrb_value args[3];
@@ -247,12 +284,64 @@ int main(void)
     }
     
     // =========================================================================
-    // ФАЗА 4: ПЕРЕДАЧА ДАНИХ (Сире Радіо / CottonCandy Protocol)
+    // ФАЗА 4: ПЕРЕДАЧА ДАНИХ (Сире Радіо / CottonCandy Protocol / Mesh)
     // =========================================================================
     
-    // Відправляємо сирі 7 байтів в ефір.
-    // Трансивер сам увімкнеться, виплюне дані і вимкнеться.
+    // 1. Якщо у нас є чужий пакет (Mesh), спочатку відправляємо його
+    if (has_mesh_relay) {
+        Radio.Send(mesh_relay_payload, 7);
+        HAL_Delay(100); // Коротка пауза між передачами
+        has_mesh_relay = 0; // Пакет відправлено, очищаємо пам'ять
+    }
+
+    // 2. Відправляємо наші власні дані
     Radio.Send(lora_payload, 7);
+
+    // =========================================================================
+    // ФАЗА 4.5: ЕНЕРГОЕФЕКТИВНИЙ СЛУХ (OTA Update & Mesh Receive)
+    // =========================================================================
+    
+    // Слухаємо ефір ТІЛЬКИ якщо ми багаті на енергію (Наприклад, напруга > 2.8В).
+    // Якщо енергії мало (наприклад, 2.2В), ми ігноруємо цей крок і йдемо спати.
+    if (vcap_voltage > 2800) {
+        lora_rx_flag = 0;
+        // Відкриваємо вікно лише на 500 мілісекунд (цього достатньо для синхронізації)
+        Radio.Rx(500); 
+        
+        uint32_t rx_start_time = HAL_GetTick();
+        while((HAL_GetTick() - rx_start_time) < 600) {
+            if(lora_rx_flag == 1) {
+                // МИ ЗЛОВИЛИ ПАКЕТ В ЕФІРІ!
+                
+                // Сценарій А: OTA Оновлення від Королеви (Пакет починається з 0x99)
+                if (incoming_lora_payload[0] == 0x99) {
+                    uint8_t chunk_idx = incoming_lora_payload[1];
+                    ota_total_chunks = incoming_lora_payload[2];
+                    uint8_t chunk_size = incoming_lora_size - 3;
+                    
+                    // Копіюємо шматок у великий буфер OTA
+                    memcpy(&ota_buffer[chunk_idx * chunk_size], &incoming_lora_payload[3], chunk_size);
+                    ota_chunks_received++;
+                    ota_bytes_received += chunk_size;
+
+                    // Якщо ми зібрали всі шматки пазлу
+                    if (ota_chunks_received >= ota_total_chunks) {
+                        Write_OTA_Contract_To_Flash(ota_buffer, ota_bytes_received);
+                        NVIC_SystemReset(); // Перезавантажуємо ядро, щоб завантажити новий код
+                    }
+                }
+                // Сценарій Б: Mesh Естафета (Чужі дані на 7 байт)
+                else if (incoming_lora_size == 7) {
+                    memcpy(mesh_relay_payload, incoming_lora_payload, 7);
+                    has_mesh_relay = 1; // Запам'ятовуємо, щоб відправити під час наступного пробудження
+                }
+                
+                break; // Виходимо з циклу очікування
+            }
+            HAL_IWDG_Refresh(&hiwdg);
+        }
+        Radio.Sleep(); // Вимикаємо приймач примусово
+    }
 
     // =========================================================================
     // ФАЗА 5: КЕНОЗИС (Абсолютний сон та збереження)
@@ -260,6 +349,15 @@ int main(void)
     // Ховаємо життєво важливі дані в RTC перед вимкненням оперативної пам'яті
     HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR0, acoustic_events);
     HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR1, last_wakeup_timestamp);
+    HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR2, has_mesh_relay);
+    
+    if (has_mesh_relay) {
+        // Пакуємо 7 байтів у два 32-бітні регістри RTC для сну
+        uint32_t reg3 = (mesh_relay_payload[0] << 24) | (mesh_relay_payload[1] << 16) | (mesh_relay_payload[2] << 8) | mesh_relay_payload[3];
+        uint32_t reg4 = (mesh_relay_payload[4] << 16) | (mesh_relay_payload[5] << 8) | mesh_relay_payload[6];
+        HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR3, reg3);
+        HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR4, reg4);
+    }
 
     // Listen for the whisper. Відключаємо ядро і чекаємо.
     HAL_SuspendTick();
@@ -274,6 +372,18 @@ int main(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+// =========================================================================
+// АПАРАТНИЙ РЕФЛЕКС РАДІО (Вуха Солдата)
+// =========================================================================
+void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
+{
+    if (size < 255) {
+        memcpy(incoming_lora_payload, payload, size);
+        incoming_lora_size = size;
+        lora_rx_flag = 1; 
+    }
+}
 
 // =========================================================================
 // АПАРАТНИЙ РЕФЛЕКС (Голос Дерева)
