@@ -70,7 +70,7 @@ typedef struct {
 EdgeCache forest_cache[CACHE_MAX_ENTRIES];
 uint8_t cache_count = 0;
 
-char json_buffer[4096]; // Великий буфер для пакетної відправки (Batching)
+char json_buffer[8192]; // Великий буфер для пакетної відправки (Batching)
 
 // =========================================================================
 // === 2. БУНКЕР OTA-ОНОВЛЕНЬ (Передача нових контрактів) ===
@@ -336,7 +336,7 @@ void Flush_Cache_To_Rails(void)
 
     // Ініціалізація HTTP (специфічно для модуля SIM7070G)
     SIM7070_SendATCommand("AT+SHCONF=\"URL\",\"http://api.silkennet.com/v1/telemetry/batch\"\r\n", 500);
-    SIM7070_SendATCommand("AT+SHCONF=\"BODYLEN\",4096\r\n", 100);
+    SIM7070_SendATCommand("AT+SHCONF=\"BODYLEN\",8192\r\n", 100);
     SIM7070_SendATCommand("AT+SHCONN\r\n", 3000); // Відкриття з'єднання
     
     // Встановлення тіла запиту
