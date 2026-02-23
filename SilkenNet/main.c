@@ -72,7 +72,7 @@ uint8_t mesh_relay_payload[16] = {0}; // Буфер для чужого 16-ба�
 uint8_t has_mesh_relay = 0;           // Прапорець: 1 - є пакет для ретрансляції
 
 volatile uint8_t lora_rx_flag = 0;
-uint8_t incoming_lora_payload[255]; 
+uint8_t incoming_lora_payload[256]; 
 uint8_t decrypted_rx_payload[256]; // Розшифрований вхідний потік
 uint16_t incoming_lora_size = 0;
 
@@ -139,6 +139,15 @@ int main(void)
   MX_CRYP_Init(); // Вмикаємо апаратний AES
 
   /* USER CODE BEGIN 2 */
+  
+  // ДОДАНО: Ініціалізація Датчика Смерті (PVD - Programmable Voltage Detector)
+  // Відстежуємо падіння напруги іоністора нижче критичної межі (2.2V)
+  PWR_PVDTypeDef sConfigPVD = {0};
+  sConfigPVD.PVDLevel = PWR_PVDLEVEL_7; // Поріг 2.2V
+  sConfigPVD.Mode = PWR_PVD_MODE_IT_RISING_FALLING; // Генерувати переривання
+  HAL_PWR_ConfigPVD(&sConfigPVD);
+  HAL_PWR_EnablePVD();
+
   // 1. Відкриваємо доступ до Backup Domain (дозволяємо запис у вічну пам'ять)
   HAL_PWR_EnableBkUpAccess();
 
@@ -168,7 +177,7 @@ int main(void)
   // 3. Калібрування АЦП (Встановлюємо абсолютний фізичний нуль)
   HAL_ADCEx_Calibration_Start(&hadc);
   
-  // ДОДАНО: 4. Ініціалізація низькорівневого радіодрайвера
+  // 4. Ініціалізація низькорівневого радіодрайвера
   Radio.Init(NULL); // Передаємо NULL, бо ми не використовуємо складні колбеки
   Radio.SetChannel(868000000); // Налаштовуємо на 868 МГц
 
@@ -222,26 +231,18 @@ int main(void)
     // ФАЗА 1.5: TINYML (Шаховий розтин / Фільтрація Свідомості)
     // =========================================================================
     
-    // Якщо ядро прокинулось через вібрацію на піні
     if (vibration_detected) {
-        // 1. Записуємо звук з АЦП (мікросекундний процес)
         // Record_Audio_Wave(audio_buffer, 512);
-
-        // 2. Запускаємо нейромережу (Whitewash)
         // ml_event_id = Run_Inference(audio_buffer, &ml_confidence);
 
-        // 3. Фільтруємо сміття: довіряємо лише якщо впевненість > 80%
         if (ml_confidence > 0.80) {
             if (ml_event_id == 2) {
                 // Це підтверджена кавітація ксилеми!
                 acoustic_events++; 
             } else if (ml_event_id == 3) {
-                // ТРИВОГА: Незаконна вирубка. Екстрена відправка.
                 // Trigger_Emergency_LoRa_TX(); 
             }
         }
-        
-        // Скидаємо прапорець вібрації
         vibration_detected = 0; 
     }
 
@@ -283,27 +284,22 @@ int main(void)
     // ФАЗА 3: ПЛАВКА (Запуск Ruby та Атрактора Лоренца)
     // =========================================================================
     
-    // Розпалюємо віртуальну машину
     mrb_state *mrb = mrb_open();
 
     if (mrb) {
-      // Завантажуємо байт-код Атрактора
       mrb_load_irep(mrb, current_lorenz_bytecode);
 
-      // Формуємо аргументи: [Квантовий Шум, Температура, Акустика]
       mrb_value args[3];
       args[0] = mrb_fixnum_value(chaos_seed);
       args[1] = mrb_fixnum_value(lora_payload[6]); // Температура (індекс змістився)
       args[2] = mrb_fixnum_value(lora_payload[7]); // Акустика (індекс змістився)
 
-      // Викликаємо метод calculate_state
       mrb_value ruby_result = mrb_funcall_argv(mrb, mrb_top_self(mrb), mrb_intern_lit(mrb, "calculate_state"), 3, args);
 
       // Байт 10: Біо-Контракт (Токеноміка)
       lora_payload[10] = (uint8_t)mrb_fixnum(ruby_result);
       mrb_close(mrb);
     } else {
-      // Якщо VM не запустилася через нестачу пам'яті
       lora_payload[10] = 0xFF; 
     }
     
@@ -331,7 +327,6 @@ int main(void)
     // Слухаємо ефір ТІЛЬКИ якщо ми багаті на енергію (напруга > 2.8В)
     if (vcap_voltage > 2800) {
         lora_rx_flag = 0;
-        // Відкриваємо вікно лише на 500 мілісекунд (цього достатньо для синхронізації)
         Radio.Rx(500); 
         
         uint32_t rx_start_time = HAL_GetTick();
@@ -348,15 +343,13 @@ int main(void)
                     ota_total_chunks = decrypted_rx_payload[2];
                     uint8_t chunk_size = incoming_lora_size - 3; // Розмір чистого коду
                     
-                    // Копіюємо шматок у великий буфер OTA
                     memcpy(&ota_buffer[chunk_idx * chunk_size], &decrypted_rx_payload[3], chunk_size);
                     ota_chunks_received++;
                     ota_bytes_received += chunk_size;
 
-                    // Якщо ми зібрали всі шматки пазлу
                     if (ota_chunks_received >= ota_total_chunks) {
                         Write_OTA_Contract_To_Flash(ota_buffer, ota_bytes_received);
-                        NVIC_SystemReset(); // Перезавантажуємо ядро, щоб завантажити новий код
+                        NVIC_SystemReset(); 
                     }
                 }
                 // Сценарій Б: Mesh Естафета (Чужі дані на 16 байт)
@@ -373,17 +366,16 @@ int main(void)
                     }
                 }
                 
-                break; // Виходимо з циклу очікування
+                break; // Виходимо з циклу
             }
             HAL_IWDG_Refresh(&hiwdg);
         }
-        Radio.Sleep(); // Вимикаємо приймач примусово
+        Radio.Sleep(); // Вимикаємо приймач
     }
 
     // =========================================================================
     // ФАЗА 5: КЕНОЗИС (Абсолютний сон та збереження)
     // =========================================================================
-    // Ховаємо життєво важливі дані в RTC перед вимкненням оперативної пам'яті
     HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR0, acoustic_events);
     HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR1, last_wakeup_timestamp);
     HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR2, has_mesh_relay);
@@ -401,7 +393,6 @@ int main(void)
         HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR6, r6);
     }
 
-    // Listen for the whisper. Відключаємо ядро і чекаємо.
     HAL_SuspendTick();
     HAL_PWREx_EnterSTOP2Mode(PWR_STOPENTRY_WFI);
     HAL_ResumeTick();
@@ -430,14 +421,29 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 // =========================================================================
 // АПАРАТНИЙ РЕФЛЕКС (Голос Дерева)
 // =========================================================================
-// Викликається апаратно, коли п'єзодиск генерує імпульс (PA0).
-// Тепер він не додає подію сліпо, а лише будить ядро для аналізу TinyML.
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
   if(GPIO_Pin == GPIO_PIN_0) 
   {
-    vibration_detected = 1; // Піднімаємо прапорець для Фази 1.5
+    vibration_detected = 1; 
   }
+}
+
+// =========================================================================
+// АПАРАТНИЙ РЕФЛЕКС СМЕРТІ (PVD Interrupt)
+// =========================================================================
+// Ця функція миттєво викликається апаратно, якщо напруга падає нижче 2.2V
+void HAL_PWR_PVDCallback(void)
+{
+    // 1. Немає часу на математику. Терміново ховаємо дані у вічну пам'ять!
+    HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR0, acoustic_events);
+    
+    // 2. Жорстко вимикаємо всі периферійні пристрої (Радіо)
+    Radio.Sleep();
+    
+    // 3. Падаємо у глибокий сон (Кома), поки напруга не підніметься знову
+    HAL_SuspendTick();
+    HAL_PWREx_EnterSTOP2Mode(PWR_STOPENTRY_WFI);
 }
 
 // Функція конфігурації апаратного AES (Створюється автоматично CubeMX)
