@@ -47,7 +47,7 @@ module SilkenNet
     CRITICAL_Z_MAX = 45.0 # Стрибок вище = аномальний стрес / втручання
     
     # Ідеальний стан конвекції для максимізації поглинання CO2
-    OPTIMAL_Z_TARGET = 20.0 
+    OPTIMAL_Z_TARGET = 29.0 
 
     def self.evaluate_and_pack(seed, temp, acoustic)
       z_val = Attractor.calculate_z_axis(seed, temp, acoustic)
