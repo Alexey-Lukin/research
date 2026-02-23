@@ -2,7 +2,7 @@
 /**
   ******************************************************************************
   * @file           : main.c
-  * @brief          : Прошивка вузла КОРОЛЕВА (LoRa RX -> SIM7070G LTE-M -> Rails)
+  * @brief          : Прошивка вузла КОРОЛЕВА (LoRa RX -> AES-128 Decrypt -> SIM7070G LTE-M -> Rails)
   * @processor      : STM32WLE5JC
   ******************************************************************************
   */
@@ -18,17 +18,23 @@
 /* USER CODE END Includes */
 
 /* Private variables ---------------------------------------------------------*/
-UART_HandleTypeDef huart1;  // Інтерфейс для модему SIM7070G
+UART_HandleTypeDef huart1;  
 SUBGHZ_HandleTypeDef hsubghz;
+CRYP_HandleTypeDef hcryp; // ДОДАНО: Апаратний криптопроцесор AES-128
 
 /* USER CODE BEGIN PV */
-// === ПАМ'ЯТЬ КОРОЛЕВИ ===
-volatile uint8_t lora_rx_flag = 0;      // Прапорець: 1 - якщо щось прилетіло з лісу
-uint8_t incoming_lora_payload[7];       // Буфер для 7 байтів від Солдата
-uint32_t current_sender_id = 0;         // ID дерева (UID мікроконтролера)
-int8_t current_rssi = 0;                // Рівень сигналу (щоб знати, як далеко дерево)
+// === 0. КЛЮЧІ ОХОРОНИ (Trading Post) ===
+// Цей ключ МАЄ БУТИ ІДЕНТИЧНИМ ключу у Солдаті
+uint32_t aes_key[4] = {0x2B7E1516, 0x28AED2A6, 0xABF71588, 0x09CF4F3C};
 
-char at_tx_buffer[256];                 // Буфер для AT-команд
+// === ПАМ'ЯТЬ КОРОЛЕВИ ===
+volatile uint8_t lora_rx_flag = 0;      
+uint8_t incoming_lora_payload[16]; // Змінено на 16 байтів для AES-блоку
+uint8_t decrypted_payload[16];     // Буфер для розшифрованих даних
+uint32_t current_sender_id = 0;         
+int8_t current_rssi = 0;                
+
+char at_tx_buffer[256];                 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -36,9 +42,9 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_SUBGHZ_Init(void);
+static void MX_CRYP_Init(void); // ДОДАНО: Ініціалізація шифрування
 
 /* USER CODE BEGIN PFP */
-// Функції-обгортки для роботи з модемом
 void SIM7070_WakeUp(void);
 void SIM7070_SendATCommand(char* command, uint32_t delay_ms);
 void Send_Data_To_Rails(uint32_t device_id, uint8_t* payload, int8_t rssi);
@@ -50,59 +56,42 @@ void Send_Data_To_Rails(uint32_t device_id, uint8_t* payload, int8_t rssi);
   */
 int main(void)
 {
-  /* MCU Configuration--------------------------------------------------------*/
   HAL_Init();
   SystemClock_Config();
 
-  /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_USART1_UART_Init(); // Ініціалізуємо зв'язок з модемом (115200 baud)
+  MX_USART1_UART_Init(); 
   MX_SUBGHZ_Init();
+  MX_CRYP_Init(); // Вмикаємо апаратний AES
 
   /* USER CODE BEGIN 2 */
-  
-  // 1. Ініціалізація Радіо (868 МГц)
   Radio.Init(NULL);
   Radio.SetChannel(868000000); 
   
-  // 2. Ініціалізація Модему SIM7070G
-  // (Надсилаємо команду перевірки готовності та налаштовуємо APN)
   SIM7070_SendATCommand("AT\r\n", 500);
-  SIM7070_SendATCommand("AT+CNMP=38\r\n", 1000); // Режим LTE Only (NB-IoT/LTE-M)
-  // Тут буде ваша AT-команда для налаштування APN мобільного оператора:
-  // SIM7070_SendATCommand("AT+CNACT=0,1\r\n", 3000); 
+  SIM7070_SendATCommand("AT+CNMP=38\r\n", 1000); 
 
-  // 3. Відкриваємо вуха: Переводимо радіомодуль у режим безперервного слухання
-  // 0xFFFFFF означає нескінченний таймаут (поки не вимкнемо живлення)
   Radio.Rx(0xFFFFFF); 
-  
   /* USER CODE END 2 */
 
-  /* Infinite loop */
   while (1)
   {
     /* USER CODE BEGIN WHILE */
     
-    // =========================================================================
-    // ФАЗА ОЧІКУВАННЯ ТА ТРАНЗИТУ
-    // =========================================================================
-    
-    // Якщо апаратне переривання радіомодуля спіймало пакет
     if (lora_rx_flag == 1) 
     {
-        // 1. Формуємо та відправляємо JSON на ваш Rails-сервер
-        Send_Data_To_Rails(current_sender_id, incoming_lora_payload, current_rssi);
+        // 1. Розшифровуємо 16 байт
+        HAL_CRYP_Decrypt(&hcryp, (uint32_t*)incoming_lora_payload, 4, (uint32_t*)decrypted_payload, 1000);
+
+        // 2. Витягуємо ID Солдата з перших 4 байтів розшифрованого пакета
+        current_sender_id = (decrypted_payload[0] << 24) | (decrypted_payload[1] << 16) | (decrypted_payload[2] << 8) | decrypted_payload[3];
+
+        // 3. Формуємо та відправляємо JSON
+        Send_Data_To_Rails(current_sender_id, decrypted_payload, current_rssi);
         
-        // 2. Очищаємо прапорець
         lora_rx_flag = 0;
-        
-        // 3. Знову переводимо радіо в режим прийому, бо під час обробки
-        //    трансивер міг перейти в режим очікування
         Radio.Rx(0xFFFFFF); 
     }
-    
-    // Королева не спить (HAL_SuspendTick тут не викликається).
-    // Вона працює від великої сонячної панелі.
     
     /* USER CODE END WHILE */
   }
@@ -110,73 +99,60 @@ int main(void)
 
 /* USER CODE BEGIN 4 */
 
-// =========================================================================
-// АПАРАТНИЙ РЕФЛЕКС РАДІО (Вуха Королеви)
-// =========================================================================
-// Ця функція викликається автоматично, коли трансивер ловить валідний пакет
 void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 {
-    // Якщо розмір співпадає з нашими 7 байтами від Солдата
-    if (size == 7) 
+    // Очікуємо 16 байт
+    if (size == 16) 
     {
-        // Копіюємо байти в пам'ять Королеви
-        memcpy(incoming_lora_payload, payload, 7);
+        memcpy(incoming_lora_payload, payload, 16);
         current_rssi = (int8_t)rssi;
-        
-        // У реальності тут ще буде зчитування Device EUI з пакета, 
-        // але для прототипу генеруємо умовний ID на базі перших байтів
-        current_sender_id = (payload[0] << 8) | payload[1]; 
-
-        // Підіймаємо прапорець для головного циклу
         lora_rx_flag = 1; 
     }
 }
 
-// =========================================================================
-// ДРАЙВЕР СТІЛЬНИКОВОГО МОДЕМУ (SIM7070G)
-// =========================================================================
-
-// Проста обгортка для відправки AT-команд через UART
 void SIM7070_SendATCommand(char* command, uint32_t delay_ms)
 {
     HAL_UART_Transmit(&huart1, (uint8_t*)command, strlen(command), 1000);
-    HAL_Delay(delay_ms); // Чекаємо на відповідь від модему (OK)
+    HAL_Delay(delay_ms); 
 }
 
-// Функція конвертації фізики в JSON та відправки HTTP POST
 void Send_Data_To_Rails(uint32_t device_id, uint8_t* payload, int8_t rssi)
 {
-    // 1. Формуємо тіло JSON
-    char json_body[128];
-    sprintf(json_body, "{\"device_id\":%lu,\"rssi\":%d,\"raw_data\":\"%02x%02x%02x%02x%02x%02x%02x\"}", 
+    char json_body[256];
+    // Форматуємо 16 байтів у hex-рядок
+    sprintf(json_body, "{\"device_id\":%lu,\"rssi\":%d,\"raw_data\":\"%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x\"}", 
             device_id, rssi,
             payload[0], payload[1], payload[2], payload[3], 
-            payload[4], payload[5], payload[6]);
+            payload[4], payload[5], payload[6], payload[7],
+            payload[8], payload[9], payload[10], payload[11],
+            payload[12], payload[13], payload[14], payload[15]);
 
-    // 2. Ініціалізуємо HTTP запит (команди специфічні для SIM7070G)
     SIM7070_SendATCommand("AT+SHCONF=\"URL\",\"http://api.silkennet.com/v1/telemetry\"\r\n", 500);
     SIM7070_SendATCommand("AT+SHCONF=\"BODYLEN\",1024\r\n", 100);
     SIM7070_SendATCommand("AT+SHCONF=\"HEADERLEN\",256\r\n", 100);
-    SIM7070_SendATCommand("AT+SHCONN\r\n", 3000); // Встановлюємо з'єднання
+    SIM7070_SendATCommand("AT+SHCONN\r\n", 3000); 
     
-    // 3. Завантажуємо JSON у пам'ять модему
     sprintf(at_tx_buffer, "AT+SHBOD=%d,10000\r\n", strlen(json_body));
     SIM7070_SendATCommand(at_tx_buffer, 100);
     SIM7070_SendATCommand(json_body, 500);
 
-    // 4. Робимо POST запит (Action 3 = POST)
     SIM7070_SendATCommand("AT+SHREQ=\"/v1/telemetry\",3\r\n", 2000);
-
-    // 5. Закриваємо з'єднання
     SIM7070_SendATCommand("AT+SHDISC\r\n", 500);
+}
+
+// Функція конфігурації апаратного AES
+static void MX_CRYP_Init(void)
+{
+  hcryp.Instance = AES;
+  hcryp.Init.DataType = CRYP_DATATYPE_32B;
+  hcryp.Init.KeySize = CRYP_KEYSIZE_128B;
+  hcryp.Init.pKey = aes_key;
+  hcryp.Init.Algorithm = CRYP_AES_ECB; 
+  HAL_CRYP_Init(&hcryp);
 }
 
 /* USER CODE END 4 */
 
-/**
-  * @brief  This function is executed in case of error occurrence.
-  * @retval None
-  */
 void Error_Handler(void)
 {
   __disable_irq();
