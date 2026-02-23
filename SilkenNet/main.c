@@ -238,12 +238,20 @@ int main(void)
       // Якщо VM не запустилася через нестачу пам'яті
       lora_payload[6] = 0xFF; 
     }
-
+    
     // =========================================================================
     // ФАЗА 4: ПЕРЕДАЧА ДАНИХ (LoRaWAN)
     // =========================================================================
-    // Тут буде функція передачі payload через стек LoRaWAN.
-    // Наприклад: LORA_SendPayload(lora_payload, 7);
+    
+    // Формуємо структуру пакету для Middleware
+    LmHandlerAppData_t AppData;
+    AppData.Port = 2; // Порт передачі
+    AppData.BufferSize = 7; // Наші 7 байтів
+    AppData.Buffer = lora_payload; 
+
+    // Відправляємо в ефір на частоті 868 МГц (стандарт EU868)
+    // LORAMAC_HANDLER_UNCONFIRMED_MSG - кричимо і засинаємо, не чекаємо "Delivery Report"
+    LmHandlerSend(&AppData, LORAMAC_HANDLER_UNCONFIRMED_MSG);
 
     // =========================================================================
     // ФАЗА 5: КЕНОЗИС (Абсолютний сон та збереження)
