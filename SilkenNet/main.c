@@ -90,6 +90,8 @@ uint8_t ota_buffer[1024];
 uint16_t ota_bytes_received = 0;
 uint8_t ota_total_chunks = 0;
 uint8_t ota_chunks_received = 0;
+// ДОДАНО: Масив прапорців для захисту від дублікатів OTA
+uint8_t ota_chunk_received[256] = {0}; 
 
 uint8_t* current_lorenz_bytecode;
 
@@ -210,6 +212,8 @@ int main(void)
       
       // Назавжди блокуємо цей DID у вічній пам'яті
       HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR7, tree_did);
+      
+      // При народженні очищаємо кеш пліток від заводського "сміття"
       recent_mesh_dids[0] = 0;
       recent_mesh_dids[1] = 0;
       recent_mesh_dids[2] = 0;
@@ -257,18 +261,21 @@ int main(void)
     last_wakeup_timestamp = current_time;
 
     // 2. Внутрішні метрики (Температура та Заряд)
-    // Тут ми продовжуємо використовувати Poll, бо це одноразові виміри (кілька мікросекунд)
     uint16_t internal_temp = 0;
     uint16_t vcap_voltage = 0;
     
+    // ДОДАНО: Роздвоєння циклу Start/Stop для стабільної роботи АЦП
     HAL_ADC_Start(&hadc); 
     if (HAL_ADC_PollForConversion(&hadc, 10) == HAL_OK) {
         internal_temp = HAL_ADC_GetValue(&hadc); // Канал температури
     }
+    HAL_ADC_Stop(&hadc); 
+
+    HAL_ADC_Start(&hadc); 
     if (HAL_ADC_PollForConversion(&hadc, 10) == HAL_OK) {
         vcap_voltage = HAL_ADC_GetValue(&hadc); // Канал VREFINT (іоністор)
     }
-    HAL_ADC_Stop(&hadc); // Миттєво вимикаємо АЦП
+    HAL_ADC_Stop(&hadc); 
 
     // 3. Квантовий Хаос (Зерно для Атрактора)
     uint32_t chaos_seed = 0;
@@ -315,6 +322,7 @@ int main(void)
                     // Це підтверджена кавітація ксилеми!
                     acoustic_events++; 
                 } else if (ml_event_id == 3) {
+                    // Тривога: Аномальна вібрація (Бензопила / Вандалізм)
                     Trigger_Emergency_LoRa_TX(); 
                 }
             }
@@ -363,7 +371,7 @@ int main(void)
 
       mrb_value args[3];
       args[0] = mrb_fixnum_value(chaos_seed);
-      args[1] = mrb_fixnum_value((int8_t)lora_payload[6]); // Температура
+      args[1] = mrb_fixnum_value((int8_t)lora_payload[6]); // Температура (Зимовий щит)
       args[2] = mrb_fixnum_value(lora_payload[7]); // Акустика
 
       mrb_value ruby_result = mrb_funcall_argv(mrb, mrb_top_self(mrb), mrb_intern_lit(mrb, "calculate_state"), 3, args);
@@ -414,30 +422,36 @@ int main(void)
                     uint8_t chunk_idx = decrypted_rx_payload[1];
                     ota_total_chunks = decrypted_rx_payload[2];
                     uint8_t chunk_size = incoming_lora_size - 3; 
-
                     uint16_t offset = chunk_idx * chunk_size;
-                    // Броня: Записуємо тільки якщо не вилазимо за межі 1024 байтів
-                    if ((offset + chunk_size) <= sizeof(ota_buffer)) {
+                    
+                    // ДОДАНО: Броня пам'яті та захист від дублікатів
+                    if (!ota_chunk_received[chunk_idx] && (offset + chunk_size) <= sizeof(ota_buffer)) {
                         memcpy(&ota_buffer[offset], &decrypted_rx_payload[3], chunk_size);
+                        ota_chunk_received[chunk_idx] = 1; // Маркуємо шматок як отриманий
                         ota_chunks_received++;
                         ota_bytes_received += chunk_size;
-                    }
 
-                    if (ota_chunks_received >= ota_total_chunks) {
-                        Write_OTA_Contract_To_Flash(ota_buffer, ota_bytes_received);
-                        NVIC_SystemReset(); 
+                        if (ota_chunks_received >= ota_total_chunks) {
+                            Write_OTA_Contract_To_Flash(ota_buffer, ota_bytes_received);
+                            NVIC_SystemReset(); 
+                        }
                     }
                 }
                 // Сценарій Б: Mesh Естафета (Чужі дані на 16 байт)
                 else if (incoming_lora_size == 16) {
                     uint8_t incoming_ttl = decrypted_rx_payload[11];
-
+                    
                     if (incoming_ttl > 0) {
-                        // Витягуємо DID ТІЛЬКИ якщо пакет ще живий
+                        // Витягуємо DID відправника (перші 4 байти)
                         uint32_t incoming_did = ((uint32_t)decrypted_rx_payload[0] << 24) | 
                             ((uint32_t)decrypted_rx_payload[1] << 16) | 
                             ((uint32_t)decrypted_rx_payload[2] << 8)  | 
                             (uint32_t)decrypted_rx_payload[3];
+
+                        // ДОДАНО: Захист від власного відлуння (Ігноруємо свій голос)
+                        if (incoming_did == tree_did) {
+                            break; 
+                        }
 
                         // Логіка Checkerboard (Захист від пінг-понгу)
                         uint8_t is_known_did = 0;
@@ -448,10 +462,11 @@ int main(void)
                             }
                         }
 
+                        // Якщо пакет ще "живий", І ми його ще не пересилали
                         if (!is_known_did) {
                             // Зменшуємо TTL
                             decrypted_rx_payload[11] = incoming_ttl - 1;
-                        
+                            
                             // Зашифровуємо змінений пакет назад для зберігання
                             HAL_CRYP_Encrypt(&hcryp, (uint32_t*)decrypted_rx_payload, 4, (uint32_t*)mesh_relay_payload, 1000);
                             has_mesh_relay = 1; 
@@ -480,7 +495,6 @@ int main(void)
     
     // Якщо є транзитний пакет (16 байтів), розкидаємо його на 4 регістри по 32 біти
     if (has_mesh_relay) {
-        // СТАЛО (Куленепробивна броня):
         uint32_t r3 = ((uint32_t)mesh_relay_payload[0] << 24) | ((uint32_t)mesh_relay_payload[1] << 16) | ((uint32_t)mesh_relay_payload[2] << 8) | (uint32_t)mesh_relay_payload[3];
         uint32_t r4 = ((uint32_t)mesh_relay_payload[4] << 24) | ((uint32_t)mesh_relay_payload[5] << 16) | ((uint32_t)mesh_relay_payload[6] << 8) | (uint32_t)mesh_relay_payload[7];
         uint32_t r5 = ((uint32_t)mesh_relay_payload[8] << 24) | ((uint32_t)mesh_relay_payload[9] << 16) | ((uint32_t)mesh_relay_payload[10] << 8) | (uint32_t)mesh_relay_payload[11];
@@ -523,38 +537,6 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 }
 
 // =========================================================================
-// АПАРАТНИЙ РЕФЛЕКС ПАНІКИ (Tamper Detection)
-// =========================================================================
-void Trigger_Emergency_LoRa_TX(void)
-{
-    uint8_t panic_payload[16] = {0};
-    uint8_t encrypted_panic[16] = {0};
-    
-    // 1. Пакуємо DID дерева
-    panic_payload[0] = (uint8_t)(tree_did >> 24);
-    panic_payload[1] = (uint8_t)(tree_did >> 16);
-    panic_payload[2] = (uint8_t)(tree_did >> 8);
-    panic_payload[3] = (uint8_t)(tree_did & 0xFF);
-    
-    // 2. Встановлюємо код паніки (0xFF у байт акустики)
-    panic_payload[7] = 0xFF; 
-    
-    // 3. Збільшуємо TTL до 5, щоб пакет вижив довше і точно дійшов
-    panic_payload[11] = 5; 
-    
-    // 4. Шифруємо AES-256 і миттєво вистрілюємо
-    HAL_CRYP_Encrypt(&hcryp, (uint32_t*)panic_payload, 4, (uint32_t*)encrypted_panic, 1000);
-    Radio.Send(encrypted_panic, 16);
-    
-    // 5. Мікро-пауза, щоб радіомодуль встиг фізично випромінити пакет до того, 
-    // як процесор піде далі по циклу і впаде в сон.
-    HAL_Delay(100);
-
-    // Примусово присипляємо радіо, щоб не садити батарею
-    Radio.Sleep();
-}
-
-// =========================================================================
 // АПАРАТНИЙ РЕФЛЕКС (Голос Дерева)
 // =========================================================================
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
@@ -580,6 +562,37 @@ void HAL_PWR_PVDCallback(void)
     // 3. Падаємо у глибокий сон (Кома), поки напруга не підніметься знову
     HAL_SuspendTick();
     HAL_PWREx_EnterSTOP2Mode(PWR_STOPENTRY_WFI);
+}
+
+// =========================================================================
+// АПАРАТНИЙ РЕФЛЕКС ПАНІКИ (Tamper Detection)
+// =========================================================================
+void Trigger_Emergency_LoRa_TX(void)
+{
+    uint8_t panic_payload[16] = {0};
+    uint8_t encrypted_panic[16] = {0};
+    
+    // 1. Пакуємо DID дерева
+    panic_payload[0] = (uint8_t)(tree_did >> 24);
+    panic_payload[1] = (uint8_t)(tree_did >> 16);
+    panic_payload[2] = (uint8_t)(tree_did >> 8);
+    panic_payload[3] = (uint8_t)(tree_did & 0xFF);
+    
+    // 2. Встановлюємо код паніки (0xFF у байт акустики)
+    panic_payload[7] = 0xFF; 
+    
+    // 3. Збільшуємо TTL до 5, щоб пакет вижив довше і точно дійшов
+    panic_payload[11] = 5; 
+    
+    // 4. Шифруємо AES-256 і миттєво вистрілюємо
+    HAL_CRYP_Encrypt(&hcryp, (uint32_t*)panic_payload, 4, (uint32_t*)encrypted_panic, 1000);
+    Radio.Send(encrypted_panic, 16);
+    
+    // 5. Мікро-пауза, щоб радіомодуль встиг фізично випромінити пакет
+    HAL_Delay(100); 
+    
+    // 6. Примусово присипляємо радіо, щоб не садити батарею
+    Radio.Sleep(); 
 }
 
 // =========================================================================
