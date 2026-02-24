@@ -431,35 +431,36 @@ int main(void)
                 // Сценарій Б: Mesh Естафета (Чужі дані на 16 байт)
                 else if (incoming_lora_size == 16) {
                     uint8_t incoming_ttl = decrypted_rx_payload[11];
-                    
-                    // Витягуємо DID відправника (перші 4 байти)
-                    uint32_t incoming_did = ((uint32_t)decrypted_rx_payload[0] << 24) | 
-                        ((uint32_t)decrypted_rx_payload[1] << 16) | 
-                        ((uint32_t)decrypted_rx_payload[2] << 8)  | 
-                        (uint32_t)decrypted_rx_payload[3];
 
-                    // Логіка Checkerboard (Захист від пінг-понгу)
-                    uint8_t is_known_did = 0;
-                    for(int i = 0; i < 3; i++) {
-                        if (recent_mesh_dids[i] == incoming_did) {
-                            is_known_did = 1;
-                            break;
+                    if (incoming_ttl > 0) {
+                        // Витягуємо DID ТІЛЬКИ якщо пакет ще живий
+                        uint32_t incoming_did = ((uint32_t)decrypted_rx_payload[0] << 24) | 
+                            ((uint32_t)decrypted_rx_payload[1] << 16) | 
+                            ((uint32_t)decrypted_rx_payload[2] << 8)  | 
+                            (uint32_t)decrypted_rx_payload[3];
+
+                        // Логіка Checkerboard (Захист від пінг-понгу)
+                        uint8_t is_known_did = 0;
+                        for(int i = 0; i < 3; i++) {
+                            if (recent_mesh_dids[i] == incoming_did) {
+                                is_known_did = 1;
+                                break;
+                            }
                         }
-                    }
 
-                    // Якщо пакет ще "живий", І ми його ще не пересилали
-                    if (incoming_ttl > 0 && !is_known_did) {
-                        // Зменшуємо TTL
-                        decrypted_rx_payload[11] = incoming_ttl - 1;
+                        if (!is_known_did) {
+                            // Зменшуємо TTL
+                            decrypted_rx_payload[11] = incoming_ttl - 1;
                         
-                        // Зашифровуємо змінений пакет назад для зберігання
-                        HAL_CRYP_Encrypt(&hcryp, (uint32_t*)decrypted_rx_payload, 4, (uint32_t*)mesh_relay_payload, 1000);
-                        has_mesh_relay = 1; 
+                            // Зашифровуємо змінений пакет назад для зберігання
+                            HAL_CRYP_Encrypt(&hcryp, (uint32_t*)decrypted_rx_payload, 4, (uint32_t*)mesh_relay_payload, 1000);
+                            has_mesh_relay = 1; 
 
-                        // Оновлюємо кеш "пліток" (зсуваємо старі записи, додаємо новий)
-                        recent_mesh_dids[2] = recent_mesh_dids[1];
-                        recent_mesh_dids[1] = recent_mesh_dids[0];
-                        recent_mesh_dids[0] = incoming_did;
+                            // Оновлюємо кеш "пліток" (зсуваємо старі записи, додаємо новий)
+                            recent_mesh_dids[2] = recent_mesh_dids[1];
+                            recent_mesh_dids[1] = recent_mesh_dids[0];
+                            recent_mesh_dids[0] = incoming_did;
+                        }
                     }
                 }
                 
