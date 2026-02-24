@@ -43,13 +43,14 @@ IWDG_HandleTypeDef hiwdg; // Додано: Апаратний сторожови
 RNG_HandleTypeDef hrng;
 RTC_HandleTypeDef hrtc;
 SUBGHZ_HandleTypeDef hsubghz;
-CRYP_HandleTypeDef hcryp; // ДОДАНО: Апаратний криптопроцесор AES-128
+CRYP_HandleTypeDef hcryp; // Апаратний криптопроцесор AES
 
 /* USER CODE BEGIN PV */
 
 // === 0. КЛЮЧІ ОХОРОНИ (Trading Post) ===
-// Секретний 128-бітний ключ мережі Silken Net
-uint32_t aes_key[4] = {0x2B7E1516, 0x28AED2A6, 0xABF71588, 0x09CF4F3C};
+// Секретний 256-бітний ключ мережі Silken Net (Gaia 2.0 Standard)
+uint32_t aes_key[8] = {0x2B7E1516, 0x28AED2A6, 0xABF71588, 0x09CF4F3C,
+                       0x1A2B3C4D, 0x5E6F7A8B, 0x9C0D1E2F, 0x3A4B5C6D};
 
 // === 1. ОРГАНИ ЧУТТЯ ТА ПАМ'ЯТЬ ===
 volatile uint8_t vibration_detected = 0; // Прапорець переривання від п'єзодиска
@@ -57,7 +58,7 @@ uint16_t acoustic_events = 0;          // Відфільтровані мікр�
 uint32_t last_wakeup_timestamp = 0;    // Час попереднього пробудження
 uint32_t delta_t_seconds = 0;          // Швидкість заряду іоністора (Метаболізм)
 
-// Пейлоад розширено до 16 байтів (один блок AES)
+// Пейлоад залишається 16 байтів (бо розмір блоку AES завжди 128 біт)
 // [UID:4] [Vcap:2] [Temp:1] [Acoustic:1] [Time:2] [Chaos:1] [TTL:1] [Pad:4]
 uint8_t lora_payload[16] = {0};
 uint8_t encrypted_payload[16] = {0}; // Буфер для зашифрованих даних перед відправкою
@@ -140,7 +141,7 @@ int main(void)
 
   /* USER CODE BEGIN 2 */
   
-  // ДОДАНО: Ініціалізація Датчика Смерті (PVD - Programmable Voltage Detector)
+  // Ініціалізація Датчика Смерті (PVD - Programmable Voltage Detector)
   // Відстежуємо падіння напруги іоністора нижче критичної межі (2.2V)
   PWR_PVDTypeDef sConfigPVD = {0};
   sConfigPVD.PVDLevel = PWR_PVDLEVEL_7; // Поріг 2.2V
@@ -231,6 +232,7 @@ int main(void)
     // ФАЗА 1.5: TINYML (Шаховий розтин / Фільтрація Свідомості)
     // =========================================================================
     
+    // Якщо ядро прокинулось через вібрацію на піні
     if (vibration_detected) {
         // Record_Audio_Wave(audio_buffer, 512);
         // ml_event_id = Run_Inference(audio_buffer, &ml_confidence);
@@ -300,11 +302,12 @@ int main(void)
       lora_payload[10] = (uint8_t)mrb_fixnum(ruby_result);
       mrb_close(mrb);
     } else {
+      // Якщо VM не запустилася через нестачу пам'яті
       lora_payload[10] = 0xFF; 
     }
     
     // =========================================================================
-    // ФАЗА 4: ПЕРЕДАЧА ДАНИХ (AES-128 + Mesh)
+    // ФАЗА 4: ПЕРЕДАЧА ДАНИХ (AES-256 + Mesh)
     // =========================================================================
     
     // 1. Якщо у нас є чужий зашифрований пакет (Mesh), спочатку відправляємо його
@@ -451,7 +454,8 @@ static void MX_CRYP_Init(void)
 {
   hcryp.Instance = AES;
   hcryp.Init.DataType = CRYP_DATATYPE_32B;
-  hcryp.Init.KeySize = CRYP_KEYSIZE_128B;
+  // ЗМІНЕНО: Активовано стандарт Gaia 2.0 (256-бітне шифрування)
+  hcryp.Init.KeySize = CRYP_KEYSIZE_256B;
   hcryp.Init.pKey = aes_key;
   hcryp.Init.Algorithm = CRYP_AES_ECB; // Використовуємо базовий Electronic Codebook для простоти 1 блоку
   HAL_CRYP_Init(&hcryp);
