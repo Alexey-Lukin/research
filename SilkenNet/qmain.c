@@ -213,7 +213,10 @@ int main(void)
         // ОБРОБКА ДАНИХ (КЕШУВАННЯ)
         // =========================================================================
         // Витягуємо унікальний ID Солдата (перші 4 байти - DID)
-        uint32_t sender_id = (decrypted_payload[0] << 24) | (decrypted_payload[1] << 16) | (decrypted_payload[2] << 8) | decrypted_payload[3];
+        uint32_t sender_id = ((uint32_t)decrypted_payload[0] << 24) | 
+                             ((uint32_t)decrypted_payload[1] << 16) | 
+                             ((uint32_t)decrypted_payload[2] << 8)  | 
+                             (uint32_t)decrypted_payload[3];
         
         // Замість миттєвої відправки, складаємо в CIFO-кеш
         Process_And_Cache_Data(sender_id, decrypted_payload, current_rssi);
