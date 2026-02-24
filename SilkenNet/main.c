@@ -358,7 +358,7 @@ int main(void)
 
       mrb_value args[3];
       args[0] = mrb_fixnum_value(chaos_seed);
-      args[1] = mrb_fixnum_value(lora_payload[6]); // Температура
+      args[1] = mrb_fixnum_value((int8_t)lora_payload[6]); // Температура
       args[2] = mrb_fixnum_value(lora_payload[7]); // Акустика
 
       mrb_value ruby_result = mrb_funcall_argv(mrb, mrb_top_self(mrb), mrb_intern_lit(mrb, "calculate_state"), 3, args);
@@ -424,8 +424,10 @@ int main(void)
                     uint8_t incoming_ttl = decrypted_rx_payload[11];
                     
                     // Витягуємо DID відправника (перші 4 байти)
-                    uint32_t incoming_did = (decrypted_rx_payload[0] << 24) | (decrypted_rx_payload[1] << 16) | 
-                                            (decrypted_rx_payload[2] << 8)  | decrypted_rx_payload[3];
+                    uint32_t incoming_did = ((uint32_t)decrypted_rx_payload[0] << 24) | 
+                        ((uint32_t)decrypted_rx_payload[1] << 16) | 
+                        ((uint32_t)decrypted_rx_payload[2] << 8)  | 
+                        (uint32_t)decrypted_rx_payload[3];
 
                     // Логіка Checkerboard (Захист від пінг-понгу)
                     uint8_t is_known_did = 0;
