@@ -210,6 +210,9 @@ int main(void)
       
       // Назавжди блокуємо цей DID у вічній пам'яті
       HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR7, tree_did);
+      recent_mesh_dids[0] = 0;
+      recent_mesh_dids[1] = 0;
+      recent_mesh_dids[2] = 0;
   }
 
   // Якщо це найперший старт в житті анкера (пам'ять порожня)
