@@ -2,7 +2,7 @@
 /**
   ******************************************************************************
   * @file           : main.c
-  * @brief          : Прошивка вузла Silken Net (Стан Нульового Лагу + TinyML + Кенозис)
+  * @brief          : Прошивка вузла Silken Net (Стан Нульового Лагу + TinyML + DID + Кенозис)
   * @processor      : STM32WLE5JC
   ******************************************************************************
   */
@@ -57,9 +57,10 @@ volatile uint8_t vibration_detected = 0; // Прапорець перерива�
 uint16_t acoustic_events = 0;          // Відфільтровані мікророзриви (Кавітація)
 uint32_t last_wakeup_timestamp = 0;    // Час попереднього пробудження
 uint32_t delta_t_seconds = 0;          // Швидкість заряду іоністора (Метаболізм)
+uint32_t tree_did = 0;                 // Decentralized Identity (Гаманець Дерева)
 
 // Пейлоад залишається 16 байтів (бо розмір блоку AES завжди 128 біт)
-// [UID:4] [Vcap:2] [Temp:1] [Acoustic:1] [Time:2] [Chaos:1] [TTL:1] [Pad:4]
+// [DID:4] [Vcap:2] [Temp:1] [Acoustic:1] [Time:2] [Chaos:1] [TTL:1] [Pad:4]
 uint8_t lora_payload[16] = {0};
 uint8_t encrypted_payload[16] = {0}; // Буфер для зашифрованих даних перед відправкою
 
@@ -170,6 +171,33 @@ int main(void)
       mesh_relay_payload[12] = r6>>24; mesh_relay_payload[13] = r6>>16; mesh_relay_payload[14] = r6>>8; mesh_relay_payload[15] = r6;
   }
 
+  // =========================================================================
+  // ГЕНЕРАЦІЯ DECENTRALIZED IDENTITY (DID)
+  // =========================================================================
+  // Зчитуємо DID з вічної пам'яті (Регістр 7)
+  tree_did = HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR7);
+  
+  if (tree_did == 0) {
+      // НАРОДЖЕННЯ (Перший старт в житті пристрою).
+      // 1. Беремо всі 96 біт унікального паспорта STM32
+      uint32_t uid_word0 = *(uint32_t*)(0x1FFF7590);
+      uint32_t uid_word1 = *(uint32_t*)(0x1FFF7594);
+      uint32_t uid_word2 = *(uint32_t*)(0x1FFF7598);
+      
+      // 2. Генеруємо істинну випадковість з теплового шуму кристала
+      uint32_t true_random = 0;
+      HAL_RNG_GenerateRandomNumber(&hrng, &true_random);
+
+      // 3. Формуємо криптографічний хеш-ідентифікатор (Digital Twin Address)
+      tree_did = uid_word0 ^ (uid_word1 << 5) ^ (uid_word2 >> 3) ^ true_random;
+      
+      // Гарантуємо, що DID ніколи не дорівнює 0
+      if (tree_did == 0) tree_did = 0x511CEE01; 
+      
+      // Назавжди блокуємо цей DID у вічній пам'яті
+      HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR7, tree_did);
+  }
+
   // Якщо це найперший старт в житті анкера (пам'ять порожня)
   if (last_wakeup_timestamp == 0) {
       last_wakeup_timestamp = HAL_GetTick() / 1000;
@@ -249,17 +277,14 @@ int main(void)
     }
 
     // =========================================================================
-    // ФАЗА 2: БІТОВЕ ПАКУВАННЯ (З Картами та Mesh-маршрутизацією)
+    // ФАЗА 2: БІТОВЕ ПАКУВАННЯ (DID та Mesh-маршрутизація)
     // =========================================================================
     
-    // Зчитуємо унікальний серійний номер (UID) чипа STM32
-    uint32_t my_soldier_id = *(uint32_t*)(0x1FFF7590);
-    
-    // Байти 0-3: Паспорт Дерева (UID)
-    lora_payload[0] = (uint8_t)(my_soldier_id >> 24);
-    lora_payload[1] = (uint8_t)(my_soldier_id >> 16);
-    lora_payload[2] = (uint8_t)(my_soldier_id >> 8);
-    lora_payload[3] = (uint8_t)(my_soldier_id & 0xFF);
+    // Байти 0-3: Криптографічний гаманець дерева (DID) замість простого серійника
+    lora_payload[0] = (uint8_t)(tree_did >> 24);
+    lora_payload[1] = (uint8_t)(tree_did >> 16);
+    lora_payload[2] = (uint8_t)(tree_did >> 8);
+    lora_payload[3] = (uint8_t)(tree_did & 0xFF);
     
     // Байти 4-5: Напруга іоністора (mV)
     lora_payload[4] = (uint8_t)(vcap_voltage >> 8);
@@ -454,8 +479,7 @@ static void MX_CRYP_Init(void)
 {
   hcryp.Instance = AES;
   hcryp.Init.DataType = CRYP_DATATYPE_32B;
-  // ЗМІНЕНО: Активовано стандарт Gaia 2.0 (256-бітне шифрування)
-  hcryp.Init.KeySize = CRYP_KEYSIZE_256B;
+  hcryp.Init.KeySize = CRYP_KEYSIZE_256B; // ЗМІНЕНО: Gaia 2.0 Standard
   hcryp.Init.pKey = aes_key;
   hcryp.Init.Algorithm = CRYP_AES_ECB; // Використовуємо базовий Electronic Codebook для простоти 1 блоку
   HAL_CRYP_Init(&hcryp);
