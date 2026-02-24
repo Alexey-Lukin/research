@@ -2,7 +2,7 @@
 /**
   ******************************************************************************
   * @file           : main.c
-  * @brief          : Прошивка вузла КОРОЛЕВА (LoRa RX -> Reflex OTA -> CIFO Cache -> Batch LTE-M)
+  * @brief          : Прошивка вузла КОРОЛЕВА (LoRa RX -> CIFO Cache -> Binary Batch CoAP -> Starlink/LTE)
   * @processor      : STM32WLE5JC
   ******************************************************************************
   */
@@ -32,9 +32,9 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-UART_HandleTypeDef huart1;  // Інтерфейс для модему SIM7070G (LTE-M)
+UART_HandleTypeDef huart1;  // Інтерфейс для модему SIM7070G (LTE-M / Starlink)
 SUBGHZ_HandleTypeDef hsubghz;
-CRYP_HandleTypeDef hcryp; // Апаратний криптопроцесор AES-128
+CRYP_HandleTypeDef hcryp; // Апаратний криптопроцесор AES
 
 /* USER CODE BEGIN PV */
 
@@ -62,7 +62,7 @@ char at_tx_buffer[256];                 // Буфер для формуванн�
 #define CACHE_MAX_ENTRIES 50 // Максимальна місткість нашого кешу
 
 typedef struct {
-    uint32_t uid;               // ID дерева
+    uint32_t uid;               // DID дерева
     uint8_t payload[16];        // Останні розшифровані дані
     int8_t rssi;                // Сила сигналу
     uint8_t is_active;          // 1 - якщо слот зайнятий
@@ -71,7 +71,10 @@ typedef struct {
 EdgeCache forest_cache[CACHE_MAX_ENTRIES];
 uint8_t cache_count = 0;
 
-char json_buffer[8192]; // Великий буфер для пакетної відправки (Batching)
+// ЗБІЛЬШЕНО ЕФЕКТИВНІСТЬ (Drifting Ice):
+// Замість 8192 байтів текстового JSON використовуємо компактний бінарний буфер 
+// 50 записів по 21 байту = всього 1050 байтів.
+uint8_t binary_batch_buffer[2048]; 
 
 // =========================================================================
 // === 2. БУНКЕР OTA-ОНОВЛЕНЬ (Передача нових контрактів) ===
@@ -209,7 +212,7 @@ int main(void)
         // =========================================================================
         // ОБРОБКА ДАНИХ (КЕШУВАННЯ)
         // =========================================================================
-        // Витягуємо унікальний ID Солдата (перші 4 байти)
+        // Витягуємо унікальний ID Солдата (перші 4 байти - DID)
         uint32_t sender_id = (decrypted_payload[0] << 24) | (decrypted_payload[1] << 16) | (decrypted_payload[2] << 8) | decrypted_payload[3];
         
         // Замість миттєвої відправки, складаємо в CIFO-кеш
@@ -221,7 +224,7 @@ int main(void)
     }
     
     // =========================================================================
-    // СКИДАННЯ КЕШУ НА СЕРВЕР (GCCS Batching)
+    // СКИДАННЯ КЕШУ НА СЕРВЕР (GCCS Batching -> UDP/CoAP)
     // =========================================================================
     // Відправляємо пакет даних, якщо кеш заповнений майже повністю (залишилось 5 вільних слотів)
     // АБО пройшло достатньо часу (наприклад, 1 година = 3 600 000 мс)
@@ -304,52 +307,51 @@ void Process_And_Cache_Data(uint32_t uid, uint8_t* payload, int8_t rssi)
 }
 
 // =========================================================================
-// ПАКЕТНЕ ВІДПРАВЛЕННЯ ЧЕРЕЗ LTE-M (GCCS)
+// ПАКЕТНЕ ВІДПРАВЛЕННЯ ЧЕРЕЗ CoAP (Бінарний масив поверх UDP)
 // =========================================================================
 void Flush_Cache_To_Rails(void)
 {
-    // Будуємо великий JSON-масив об'єктів
-    strcpy(json_buffer, "[");
-    
-    uint8_t is_first = 1;
-    char temp_obj[256];
+    uint16_t offset = 0;
 
+    // Пакуємо весь кеш у щільний бінарний масив (21 байт на запис)
     for(int i = 0; i < CACHE_MAX_ENTRIES; i++) {
         if(forest_cache[i].is_active) {
-            if (!is_first) { strcat(json_buffer, ","); }
+            // Копіюємо 4 байти DID (великоендіанний формат мережі)
+            binary_batch_buffer[offset++] = (uint8_t)(forest_cache[i].uid >> 24);
+            binary_batch_buffer[offset++] = (uint8_t)(forest_cache[i].uid >> 16);
+            binary_batch_buffer[offset++] = (uint8_t)(forest_cache[i].uid >> 8);
+            binary_batch_buffer[offset++] = (uint8_t)(forest_cache[i].uid & 0xFF);
             
-            sprintf(temp_obj, "{\"id\":%lu,\"rssi\":%d,\"data\":\"%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x\"}", 
-                    forest_cache[i].uid, forest_cache[i].rssi,
-                    forest_cache[i].payload[0], forest_cache[i].payload[1], forest_cache[i].payload[2], forest_cache[i].payload[3], 
-                    forest_cache[i].payload[4], forest_cache[i].payload[5], forest_cache[i].payload[6], forest_cache[i].payload[7],
-                    forest_cache[i].payload[8], forest_cache[i].payload[9], forest_cache[i].payload[10], forest_cache[i].payload[11],
-                    forest_cache[i].payload[12], forest_cache[i].payload[13], forest_cache[i].payload[14], forest_cache[i].payload[15]);
+            // Копіюємо 1 байт RSSI
+            binary_batch_buffer[offset++] = (uint8_t)forest_cache[i].rssi;
             
-            strcat(json_buffer, temp_obj);
+            // Копіюємо 16 байтів розшифрованого фізичного Payload'у
+            memcpy(&binary_batch_buffer[offset], forest_cache[i].payload, 16);
+            offset += 16;
             
-            // Звільняємо слот після пакування
+            // Звільняємо слот
             forest_cache[i].is_active = 0;
-            is_first = 0;
         }
     }
-    strcat(json_buffer, "]");
     cache_count = 0;
 
-    // Ініціалізація HTTP (специфічно для модуля SIM7070G)
-    SIM7070_SendATCommand("AT+SHCONF=\"URL\",\"http://api.silkennet.com/v1/telemetry/batch\"\r\n", 500);
-    SIM7070_SendATCommand("AT+SHCONF=\"BODYLEN\",8192\r\n", 100);
-    SIM7070_SendATCommand("AT+SHCONN\r\n", 3000); // Відкриття з'єднання
-    
-    // Встановлення тіла запиту
-    sprintf(at_tx_buffer, "AT+SHBOD=%d,10000\r\n", strlen(json_buffer));
-    SIM7070_SendATCommand(at_tx_buffer, 100);
-    SIM7070_SendATCommand(json_buffer, 1000); // Передача JSON
+    if (offset == 0) return;
 
-    // Виконання POST запиту (Дія 3)
-    SIM7070_SendATCommand("AT+SHREQ=\"/v1/telemetry/batch\",3\r\n", 2000);
+    // Ініціалізація CoAP сесії (UDP)
+    SIM7070_SendATCommand("AT+CCOAPNEW=\"coap://api.silkennet.com:5683\"\r\n", 1000);
     
-    // Розрив з'єднання
-    SIM7070_SendATCommand("AT+SHDISC\r\n", 500);
+    // Формуємо CoAP POST запит. Параметри: 0(ID контексту), 2(POST), "telemetry/batch"(URI), offset(довжина)
+    sprintf(at_tx_buffer, "AT+CCOAPSEND=0,2,\"telemetry/batch\",%d\r\n", offset);
+    SIM7070_SendATCommand(at_tx_buffer, 100);
+    
+    // Передаємо суцільний потік бінарних байтів у модем
+    HAL_UART_Transmit(&huart1, binary_batch_buffer, offset, 2000);
+    
+    // Чекаємо, поки модем надішле дані через ефір та отримає UDP ACK від сервера
+    HAL_Delay(1000); 
+
+    // Закриваємо CoAP сесію, звільняючи ресурси модему
+    SIM7070_SendATCommand("AT+CCOAPDEL=0\r\n", 500);
 }
 
 // =========================================================================
@@ -369,7 +371,7 @@ static void MX_CRYP_Init(void)
 {
   hcryp.Instance = AES;
   hcryp.Init.DataType = CRYP_DATATYPE_32B;
-  // ЗМІНЕНО: Активовано стандарт Gaia 2.0 (256-бітне шифрування)
+  // Активовано стандарт Gaia 2.0 (256-бітне шифрування)
   hcryp.Init.KeySize = CRYP_KEYSIZE_256B;
   hcryp.Init.pKey = aes_key;
   hcryp.Init.Algorithm = CRYP_AES_ECB; // Режим ECB достатній для одного 16-байтного блоку
