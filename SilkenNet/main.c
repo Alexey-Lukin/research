@@ -2,7 +2,7 @@
 /**
   ******************************************************************************
   * @file           : main.c
-  * @brief          : Прошивка вузла Silken Net (Стан Нульового Лагу + TinyML + DID + Кенозис)
+  * @brief          : Прошивка вузла Silken Net (Стан Нульового Лагу + TinyML + DID + Directed Mesh + Кенозис)
   * @processor      : STM32WLE5JC
   ******************************************************************************
   */
@@ -20,7 +20,7 @@
 // Підключаємо скомпільовану нейромережу TinyML
 #include "silken_net_audio_model.h"
 
-// ДОДАНО: Підключаємо низькорівневий драйвер радіо (Radio Middleware)
+// Підключаємо низькорівневий драйвер радіо (Radio Middleware)
 #include "radio.h" 
 /* USER CODE END Includes */
 
@@ -39,7 +39,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc;
-IWDG_HandleTypeDef hiwdg; // Додано: Апаратний сторожовий пес
+IWDG_HandleTypeDef hiwdg; // Апаратний сторожовий пес
 RNG_HandleTypeDef hrng;
 RTC_HandleTypeDef hrtc;
 SUBGHZ_HandleTypeDef hsubghz;
@@ -69,9 +69,13 @@ float audio_buffer[512];       // Буфер для запису звуково�
 uint8_t ml_event_id = 0;       // Результат: 0-Тиша, 1-Вітер, 2-Кавітація, 3-Пилка
 float ml_confidence = 0.0;     // Рівень впевненості моделі (0.0 - 1.0)
 
-// === 1.8. ПАМ'ЯТЬ ЕСТАФЕТИ (Mesh Relay) ТА OTA ===
+// === 1.8. ПАМ'ЯТЬ ЕСТАФЕТИ (Directed Mesh) ТА OTA ===
 uint8_t mesh_relay_payload[16] = {0}; // Буфер для чужого 16-байтного пакета
 uint8_t has_mesh_relay = 0;           // Прапорець: 1 - є пакет для ретрансляції
+
+// ДОДАНО: Кеш "пліток" (Wall to Wall Cobwebs). Пам'ятаємо останні 3 чужі DID, 
+// щоб не ганяти їхні дані по колу (захист від пінг-понгу).
+uint32_t recent_mesh_dids[3] = {0, 0, 0}; 
 
 volatile uint8_t lora_rx_flag = 0;
 uint8_t incoming_lora_payload[256]; 
@@ -101,11 +105,11 @@ const uint8_t lorenz_bytecode[] = {
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_ADC_Init(void);
-static void MX_IWDG_Init(void); // Додано: Ініціалізація IWDG
+static void MX_IWDG_Init(void); // Ініціалізація IWDG
 static void MX_RNG_Init(void);
 static void MX_RTC_Init(void);
 static void MX_SUBGHZ_Init(void);
-static void MX_CRYP_Init(void); // ДОДАНО: Ініціалізація шифрування
+static void MX_CRYP_Init(void); // Ініціалізація шифрування
 
 /* USER CODE BEGIN PFP */
 // Псевдо-функції для роботи зі звуком та тривогами
@@ -170,6 +174,11 @@ int main(void)
       mesh_relay_payload[8] = r5>>24; mesh_relay_payload[9] = r5>>16; mesh_relay_payload[10] = r5>>8; mesh_relay_payload[11] = r5;
       mesh_relay_payload[12] = r6>>24; mesh_relay_payload[13] = r6>>16; mesh_relay_payload[14] = r6>>8; mesh_relay_payload[15] = r6;
   }
+
+  // ДОДАНО: Відновлюємо пам'ять останніх 3-х почутих DID
+  recent_mesh_dids[0] = HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR8);
+  recent_mesh_dids[1] = HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR9);
+  recent_mesh_dids[2] = HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR10);
 
   // =========================================================================
   // ГЕНЕРАЦІЯ DECENTRALIZED IDENTITY (DID)
@@ -318,8 +327,8 @@ int main(void)
 
       mrb_value args[3];
       args[0] = mrb_fixnum_value(chaos_seed);
-      args[1] = mrb_fixnum_value(lora_payload[6]); // Температура (індекс змістився)
-      args[2] = mrb_fixnum_value(lora_payload[7]); // Акустика (індекс змістився)
+      args[1] = mrb_fixnum_value(lora_payload[6]); // Температура
+      args[2] = mrb_fixnum_value(lora_payload[7]); // Акустика
 
       mrb_value ruby_result = mrb_funcall_argv(mrb, mrb_top_self(mrb), mrb_intern_lit(mrb, "calculate_state"), 3, args);
 
@@ -349,7 +358,7 @@ int main(void)
     Radio.Send(encrypted_payload, 16);
 
     // =========================================================================
-    // ФАЗА 4.5: ЕНЕРГОЕФЕКТИВНИЙ СЛУХ (OTA Update & Mesh Receive)
+    // ФАЗА 4.5: ЕНЕРГОЕФЕКТИВНИЙ СЛУХ (Directed Mesh & OTA)
     // =========================================================================
     
     // Слухаємо ефір ТІЛЬКИ якщо ми багаті на енергію (напруга > 2.8В)
@@ -361,7 +370,6 @@ int main(void)
         while((HAL_GetTick() - rx_start_time) < 600) {
             if(lora_rx_flag == 1) {
                 // МИ ЗЛОВИЛИ ПАКЕТ! Розшифровуємо його.
-                // Довжина вхідного буфера кратна 16 байтам (4 слова)
                 uint16_t blocks = incoming_lora_size / 4; 
                 HAL_CRYP_Decrypt(&hcryp, (uint32_t*)incoming_lora_payload, blocks, (uint32_t*)decrypted_rx_payload, 1000);
 
@@ -369,7 +377,7 @@ int main(void)
                 if (decrypted_rx_payload[0] == 0x99) {
                     uint8_t chunk_idx = decrypted_rx_payload[1];
                     ota_total_chunks = decrypted_rx_payload[2];
-                    uint8_t chunk_size = incoming_lora_size - 3; // Розмір чистого коду
+                    uint8_t chunk_size = incoming_lora_size - 3; 
                     
                     memcpy(&ota_buffer[chunk_idx * chunk_size], &decrypted_rx_payload[3], chunk_size);
                     ota_chunks_received++;
@@ -384,13 +392,32 @@ int main(void)
                 else if (incoming_lora_size == 16) {
                     uint8_t incoming_ttl = decrypted_rx_payload[11];
                     
-                    // Якщо пакет ще "живий", зменшуємо TTL і готуємо до ретрансляції
-                    if (incoming_ttl > 0) {
+                    // Витягуємо DID відправника (перші 4 байти)
+                    uint32_t incoming_did = (decrypted_rx_payload[0] << 24) | (decrypted_rx_payload[1] << 16) | 
+                                            (decrypted_rx_payload[2] << 8)  | decrypted_rx_payload[3];
+
+                    // ДОДАНО: Логіка Checkerboard (Захист від пінг-понгу)
+                    uint8_t is_known_did = 0;
+                    for(int i = 0; i < 3; i++) {
+                        if (recent_mesh_dids[i] == incoming_did) {
+                            is_known_did = 1;
+                            break;
+                        }
+                    }
+
+                    // Якщо пакет ще "живий", І ми його ще не пересилали
+                    if (incoming_ttl > 0 && !is_known_did) {
+                        // Зменшуємо TTL
                         decrypted_rx_payload[11] = incoming_ttl - 1;
                         
                         // Зашифровуємо змінений пакет назад для зберігання
                         HAL_CRYP_Encrypt(&hcryp, (uint32_t*)decrypted_rx_payload, 4, (uint32_t*)mesh_relay_payload, 1000);
                         has_mesh_relay = 1; 
+
+                        // Оновлюємо кеш "пліток" (зсуваємо старі записи, додаємо новий)
+                        recent_mesh_dids[2] = recent_mesh_dids[1];
+                        recent_mesh_dids[1] = recent_mesh_dids[0];
+                        recent_mesh_dids[0] = incoming_did;
                     }
                 }
                 
@@ -420,6 +447,11 @@ int main(void)
         HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR5, r5);
         HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR6, r6);
     }
+
+    // ДОДАНО: Зберігаємо кеш DID-ів у вічну пам'ять перед сном
+    HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR8, recent_mesh_dids[0]);
+    HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR9, recent_mesh_dids[1]);
+    HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR10, recent_mesh_dids[2]);
 
     HAL_SuspendTick();
     HAL_PWREx_EnterSTOP2Mode(PWR_STOPENTRY_WFI);
