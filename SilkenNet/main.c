@@ -414,10 +414,14 @@ int main(void)
                     uint8_t chunk_idx = decrypted_rx_payload[1];
                     ota_total_chunks = decrypted_rx_payload[2];
                     uint8_t chunk_size = incoming_lora_size - 3; 
-                    
-                    memcpy(&ota_buffer[chunk_idx * chunk_size], &decrypted_rx_payload[3], chunk_size);
-                    ota_chunks_received++;
-                    ota_bytes_received += chunk_size;
+
+                    uint16_t offset = chunk_idx * chunk_size;
+                    // Броня: Записуємо тільки якщо не вилазимо за межі 1024 байтів
+                    if ((offset + chunk_size) <= sizeof(ota_buffer)) {
+                        memcpy(&ota_buffer[offset], &decrypted_rx_payload[3], chunk_size);
+                        ota_chunks_received++;
+                        ota_bytes_received += chunk_size;
+                    }
 
                     if (ota_chunks_received >= ota_total_chunks) {
                         Write_OTA_Contract_To_Flash(ota_buffer, ota_bytes_received);
