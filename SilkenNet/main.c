@@ -2,7 +2,7 @@
 /**
   ******************************************************************************
   * @file           : main.c
-  * @brief          : Прошивка вузла Silken Net (Стан Нульового Лагу + TinyML + DID + Directed Mesh + Кенозис)
+  * @brief          : Прошивка вузла Silken Net (Стан Нульового Лагу + TinyML + DID + Directed Mesh + DMA Sleep)
   * @processor      : STM32WLE5JC
   ******************************************************************************
   */
@@ -39,6 +39,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc;
+TIM_HandleTypeDef htim2;  // Додано: Таймер-метроном для керування швидкістю DMA (напр. 16 кГц)
 IWDG_HandleTypeDef hiwdg; // Апаратний сторожовий пес
 RNG_HandleTypeDef hrng;
 RTC_HandleTypeDef hrtc;
@@ -64,16 +65,18 @@ uint32_t tree_did = 0;                 // Decentralized Identity (Гаманец
 uint8_t lora_payload[16] = {0};
 uint8_t encrypted_payload[16] = {0}; // Буфер для зашифрованих даних перед відправкою
 
-// === 1.5. ПАМ'ЯТЬ TINYML (Свідомість звуку) ===
-float audio_buffer[512];       // Буфер для запису звукової хвилі
-uint8_t ml_event_id = 0;       // Результат: 0-Тиша, 1-Вітер, 2-Кавітація, 3-Пилка
-float ml_confidence = 0.0;     // Рівень впевненості моделі (0.0 - 1.0)
+// === 1.5. ПАМ'ЯТЬ TINYML (Свідомість звуку + DMA) ===
+uint16_t raw_audio_buffer[512];   // Буфер для DMA (сирі 12-бітні дані від АЦП)
+float audio_buffer[512];          // Буфер для запису звукової хвилі (нормалізований для TinyML)
+volatile uint8_t audio_ready = 0; // Прапорець завершення роботи DMA-павутиння
+uint8_t ml_event_id = 0;          // Результат: 0-Тиша, 1-Вітер, 2-Кавітація, 3-Пилка
+float ml_confidence = 0.0;        // Рівень впевненості моделі (0.0 - 1.0)
 
 // === 1.8. ПАМ'ЯТЬ ЕСТАФЕТИ (Directed Mesh) ТА OTA ===
 uint8_t mesh_relay_payload[16] = {0}; // Буфер для чужого 16-байтного пакета
 uint8_t has_mesh_relay = 0;           // Прапорець: 1 - є пакет для ретрансляції
 
-// ДОДАНО: Кеш "пліток" (Wall to Wall Cobwebs). Пам'ятаємо останні 3 чужі DID, 
+// Кеш "пліток" (Wall to Wall Cobwebs). Пам'ятаємо останні 3 чужі DID, 
 // щоб не ганяти їхні дані по колу (захист від пінг-понгу).
 uint32_t recent_mesh_dids[3] = {0, 0, 0}; 
 
@@ -105,6 +108,7 @@ const uint8_t lorenz_bytecode[] = {
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_ADC_Init(void);
+static void MX_TIM2_Init(void); // Додано: Ініціалізація таймера для DMA
 static void MX_IWDG_Init(void); // Ініціалізація IWDG
 static void MX_RNG_Init(void);
 static void MX_RTC_Init(void);
@@ -138,6 +142,7 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_ADC_Init();
+  MX_TIM2_Init(); // Ініціалізуємо метроном для DMA
   MX_IWDG_Init(); // Ініціалізуємо Сторожового Пса
   MX_RNG_Init();
   MX_RTC_Init();
@@ -175,7 +180,7 @@ int main(void)
       mesh_relay_payload[12] = r6>>24; mesh_relay_payload[13] = r6>>16; mesh_relay_payload[14] = r6>>8; mesh_relay_payload[15] = r6;
   }
 
-  // ДОДАНО: Відновлюємо пам'ять останніх 3-х почутих DID
+  // Відновлюємо пам'ять останніх 3-х почутих DID
   recent_mesh_dids[0] = HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR8);
   recent_mesh_dids[1] = HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR9);
   recent_mesh_dids[2] = HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR10);
@@ -249,6 +254,7 @@ int main(void)
     last_wakeup_timestamp = current_time;
 
     // 2. Внутрішні метрики (Температура та Заряд)
+    // Тут ми продовжуємо використовувати Poll, бо це одноразові виміри (кілька мікросекунд)
     uint16_t internal_temp = 0;
     uint16_t vcap_voltage = 0;
     
@@ -266,23 +272,48 @@ int main(void)
     HAL_RNG_GenerateRandomNumber(&hrng, &chaos_seed);
 
     // =========================================================================
-    // ФАЗА 1.5: TINYML (Шаховий розтин / Фільтрація Свідомості)
+    // ФАЗА 1.5: TINYML (Шаховий розтин / Фільтрація Свідомості через DMA)
     // =========================================================================
     
     // Якщо ядро прокинулось через вібрацію на піні
     if (vibration_detected) {
-        // Record_Audio_Wave(audio_buffer, 512);
-        // ml_event_id = Run_Inference(audio_buffer, &ml_confidence);
+        vibration_detected = 0;
+        audio_ready = 0;
 
-        if (ml_confidence > 0.80) {
-            if (ml_event_id == 2) {
-                // Це підтверджена кавітація ксилеми!
-                acoustic_events++; 
-            } else if (ml_event_id == 3) {
-                // Trigger_Emergency_LoRa_TX(); 
+        // 1. Запускаємо Таймер-метроном і АЦП у режимі DMA
+        HAL_TIM_Base_Start(&htim2);
+        HAL_ADC_Start_DMA(&hadc, (uint32_t*)raw_audio_buffer, 512);
+
+        // 2. ВІДМИКАЄМО ЯДРО ПРОЦЕСОРА (Падаємо в Легкий Сон)
+        // Поки CPU спить, DMA перекидає байти з АЦП у raw_audio_buffer без участі ядра.
+        HAL_SuspendTick();
+        HAL_PWR_EnterSLEEPMode(PWR_MAINREGULATOR_ON, PWR_SLEEPENTRY_WFI);
+        HAL_ResumeTick();
+
+        // --- ТУТ ПРОЦЕСОР ПРОКИНЕТЬСЯ, КОЛИ DMA ЗАПОВНИТЬ БУФЕР ---
+
+        // 3. Якщо буфер зібрано успішно
+        if (audio_ready == 1) {
+            HAL_ADC_Stop_DMA(&hadc); // Зупиняємо конвеєр
+            HAL_TIM_Base_Stop(&htim2);
+
+            // 4. Швидко переводимо 12-бітні RAW-дані у Float для TinyML
+            for(int i = 0; i < 512; i++) {
+                audio_buffer[i] = (float)raw_audio_buffer[i] / 4095.0f; // Нормалізація 0.0 - 1.0
+            }
+
+            // 5. Запускаємо "Свідомість" (Шаховий розтин звуку)
+            // ml_event_id = Run_Inference(audio_buffer, &ml_confidence);
+
+            if (ml_confidence > 0.80) {
+                if (ml_event_id == 2) {
+                    // Це підтверджена кавітація ксилеми!
+                    acoustic_events++; 
+                } else if (ml_event_id == 3) {
+                    // Trigger_Emergency_LoRa_TX(); 
+                }
             }
         }
-        vibration_detected = 0; 
     }
 
     // =========================================================================
@@ -396,7 +427,7 @@ int main(void)
                     uint32_t incoming_did = (decrypted_rx_payload[0] << 24) | (decrypted_rx_payload[1] << 16) | 
                                             (decrypted_rx_payload[2] << 8)  | decrypted_rx_payload[3];
 
-                    // ДОДАНО: Логіка Checkerboard (Захист від пінг-понгу)
+                    // Логіка Checkerboard (Захист від пінг-понгу)
                     uint8_t is_known_did = 0;
                     for(int i = 0; i < 3; i++) {
                         if (recent_mesh_dids[i] == incoming_did) {
@@ -448,7 +479,7 @@ int main(void)
         HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR6, r6);
     }
 
-    // ДОДАНО: Зберігаємо кеш DID-ів у вічну пам'ять перед сном
+    // Зберігаємо кеш DID-ів у вічну пам'ять перед сном
     HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR8, recent_mesh_dids[0]);
     HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR9, recent_mesh_dids[1]);
     HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR10, recent_mesh_dids[2]);
@@ -504,6 +535,16 @@ void HAL_PWR_PVDCallback(void)
     // 3. Падаємо у глибокий сон (Кома), поки напруга не підніметься знову
     HAL_SuspendTick();
     HAL_PWREx_EnterSTOP2Mode(PWR_STOPENTRY_WFI);
+}
+
+// =========================================================================
+// АПАРАТНИЙ РЕФЛЕКС DMA (Буфер звуку заповнено)
+// =========================================================================
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
+{
+    // Ця функція викликається апаратно, коли DMA запише 512-й байт.
+    // Вона миттєво виводить процесор зі стану SLEEP для аналізу.
+    audio_ready = 1;
 }
 
 // Функція конфігурації апаратного AES (Створюється автоматично CubeMX)
