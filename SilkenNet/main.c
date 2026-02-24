@@ -298,7 +298,18 @@ int main(void)
         // Поки CPU спить, DMA перекидає байти з АЦП у raw_audio_buffer без участі ядра.
         HAL_SuspendTick();
         while (!audio_ready) {
-            HAL_PWR_EnterSLEEPMode(PWR_MAINREGULATOR_ON, PWR_SLEEPENTRY_WFI);
+            // Вимикаємо глобальні переривання, щоб уникнути Race Condition
+            __disable_irq(); 
+            
+            // Ще раз перевіряємо, чи не сталося переривання поки ми їх вимикали
+            if (!audio_ready) { 
+                // Засинаємо. Переривання DMA все одно розбудить процесор, 
+                // навіть якщо __disable_irq() активний (так працює WFI).
+                HAL_PWR_EnterSLEEPMode(PWR_MAINREGULATOR_ON, PWR_SLEEPENTRY_WFI);
+            }
+            // Одразу після пробудження вмикаємо переривання назад, 
+            // щоб процесор зміг обробити Callback від DMA і змінити audio_ready.
+            __enable_irq(); 
         }
         HAL_ResumeTick();
 
