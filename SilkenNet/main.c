@@ -472,10 +472,11 @@ int main(void)
     
     // Якщо є транзитний пакет (16 байтів), розкидаємо його на 4 регістри по 32 біти
     if (has_mesh_relay) {
-        uint32_t r3 = (mesh_relay_payload[0] << 24) | (mesh_relay_payload[1] << 16) | (mesh_relay_payload[2] << 8) | mesh_relay_payload[3];
-        uint32_t r4 = (mesh_relay_payload[4] << 24) | (mesh_relay_payload[5] << 16) | (mesh_relay_payload[6] << 8) | mesh_relay_payload[7];
-        uint32_t r5 = (mesh_relay_payload[8] << 24) | (mesh_relay_payload[9] << 16) | (mesh_relay_payload[10] << 8) | mesh_relay_payload[11];
-        uint32_t r6 = (mesh_relay_payload[12] << 24) | (mesh_relay_payload[13] << 16) | (mesh_relay_payload[14] << 8) | mesh_relay_payload[15];
+        // СТАЛО (Куленепробивна броня):
+        uint32_t r3 = ((uint32_t)mesh_relay_payload[0] << 24) | ((uint32_t)mesh_relay_payload[1] << 16) | ((uint32_t)mesh_relay_payload[2] << 8) | (uint32_t)mesh_relay_payload[3];
+        uint32_t r4 = ((uint32_t)mesh_relay_payload[4] << 24) | ((uint32_t)mesh_relay_payload[5] << 16) | ((uint32_t)mesh_relay_payload[6] << 8) | (uint32_t)mesh_relay_payload[7];
+        uint32_t r5 = ((uint32_t)mesh_relay_payload[8] << 24) | ((uint32_t)mesh_relay_payload[9] << 16) | ((uint32_t)mesh_relay_payload[10] << 8) | (uint32_t)mesh_relay_payload[11];
+        uint32_t r6 = ((uint32_t)mesh_relay_payload[12] << 24) | ((uint32_t)mesh_relay_payload[13] << 16) | ((uint32_t)mesh_relay_payload[14] << 8) | (uint32_t)mesh_relay_payload[15];
         
         HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR3, r3);
         HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR4, r4);
