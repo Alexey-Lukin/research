@@ -287,7 +287,9 @@ int main(void)
         // 2. ВІДМИКАЄМО ЯДРО ПРОЦЕСОРА (Падаємо в Легкий Сон)
         // Поки CPU спить, DMA перекидає байти з АЦП у raw_audio_buffer без участі ядра.
         HAL_SuspendTick();
-        HAL_PWR_EnterSLEEPMode(PWR_MAINREGULATOR_ON, PWR_SLEEPENTRY_WFI);
+        while (!audio_ready) {
+            HAL_PWR_EnterSLEEPMode(PWR_MAINREGULATOR_ON, PWR_SLEEPENTRY_WFI);
+        }
         HAL_ResumeTick();
 
         // --- ТУТ ПРОЦЕСОР ПРОКИНЕТЬСЯ, КОЛИ DMA ЗАПОВНИТЬ БУФЕР ---
