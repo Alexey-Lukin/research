@@ -341,9 +341,10 @@ void Flush_Cache_To_Rails(void)
 
     // Ініціалізація CoAP сесії (UDP)
     SIM7070_SendATCommand("AT+CCOAPNEW=\"coap://api.silkennet.com:5683\"\r\n", 1000);
-    
-    // 1. Початок команди (без \r\n в кінці)
-    sprintf(at_tx_buffer, "AT+CCOAPSEND=0,2,\"telemetry/batch\",");
+
+    // 1. Початок команди (Вказуємо довжину HEX-рядка та відкриваємо лапки)
+    // Оскільки кожен байт стає двома символами (наприклад, 0xAB -> "ab"), довжина рядка = offset * 2
+    sprintf(at_tx_buffer, "AT+CCOAPSEND=0,2,\"telemetry/batch\",%d,\"", offset * 2);
     HAL_UART_Transmit(&huart1, (uint8_t*)at_tx_buffer, strlen(at_tx_buffer), 100);
 
     // 2. Перетворюємо бінарний буфер у Hex-рядок на льоту і відправляємо в модем
@@ -353,8 +354,8 @@ void Flush_Cache_To_Rails(void)
         HAL_UART_Transmit(&huart1, (uint8_t*)hex_byte, 2, 10);
     }
 
-    // 3. Завершуємо команду (імітуємо натискання Enter)
-    HAL_UART_Transmit(&huart1, (uint8_t*)"\r\n", 2, 100);
+    // 3. Завершуємо команду (Закриваємо лапки і імітуємо натискання Enter)
+    HAL_UART_Transmit(&huart1, (uint8_t*)"\"\r\n", 3, 100);
     
     // Чекаємо, поки модем надішле дані через ефір та отримає UDP ACK від сервера
     HAL_Delay(2000); 
