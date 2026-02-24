@@ -315,7 +315,7 @@ int main(void)
                     // Це підтверджена кавітація ксилеми!
                     acoustic_events++; 
                 } else if (ml_event_id == 3) {
-                    // Trigger_Emergency_LoRa_TX(); 
+                    Trigger_Emergency_LoRa_TX(); 
                 }
             }
         }
@@ -519,6 +519,35 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
         incoming_lora_size = size;
         lora_rx_flag = 1; 
     }
+}
+
+// =========================================================================
+// АПАРАТНИЙ РЕФЛЕКС ПАНІКИ (Tamper Detection)
+// =========================================================================
+void Trigger_Emergency_LoRa_TX(void)
+{
+    uint8_t panic_payload[16] = {0};
+    uint8_t encrypted_panic[16] = {0};
+    
+    // 1. Пакуємо DID дерева
+    panic_payload[0] = (uint8_t)(tree_did >> 24);
+    panic_payload[1] = (uint8_t)(tree_did >> 16);
+    panic_payload[2] = (uint8_t)(tree_did >> 8);
+    panic_payload[3] = (uint8_t)(tree_did & 0xFF);
+    
+    // 2. Встановлюємо код паніки (0xFF у байт акустики)
+    panic_payload[7] = 0xFF; 
+    
+    // 3. Збільшуємо TTL до 5, щоб пакет вижив довше і точно дійшов
+    panic_payload[11] = 5; 
+    
+    // 4. Шифруємо AES-256 і миттєво вистрілюємо
+    HAL_CRYP_Encrypt(&hcryp, (uint32_t*)panic_payload, 4, (uint32_t*)encrypted_panic, 1000);
+    Radio.Send(encrypted_panic, 16);
+    
+    // 5. Мікро-пауза, щоб радіомодуль встиг фізично випромінити пакет до того, 
+    // як процесор піде далі по циклу і впаде в сон.
+    HAL_Delay(100); 
 }
 
 // =========================================================================
