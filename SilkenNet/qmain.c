@@ -41,9 +41,10 @@ CRYP_HandleTypeDef hcryp; // Апаратний криптопроцесор AES
 // =========================================================================
 // === 0. КЛЮЧІ ОХОРОНИ (Trading Post) ===
 // =========================================================================
-// Секретний 128-бітний ключ мережі Silken Net. 
+// Секретний 256-бітний ключ мережі Silken Net (Gaia 2.0 Standard). 
 // МАЄ БУТИ ІДЕНТИЧНИМ ключу, зашитому в усіх Солдатах.
-uint32_t aes_key[4] = {0x2B7E1516, 0x28AED2A6, 0xABF71588, 0x09CF4F3C};
+uint32_t aes_key[8] = {0x2B7E1516, 0x28AED2A6, 0xABF71588, 0x09CF4F3C,
+                       0x1A2B3C4D, 0x5E6F7A8B, 0x9C0D1E2F, 0x3A4B5C6D};
 
 // =========================================================================
 // === 1. ПАМ'ЯТЬ КОРОЛЕВИ (Прийом Даних) ===
@@ -126,7 +127,7 @@ int main(void)
   MX_GPIO_Init();
   MX_USART1_UART_Init(); // UART для розмови з SIM7070G (115200 baud)
   MX_SUBGHZ_Init();
-  MX_CRYP_Init();        // Вмикаємо апаратний модуль AES-128
+  MX_CRYP_Init();        // Вмикаємо апаратний модуль AES
 
   /* USER CODE BEGIN 2 */
   
@@ -245,7 +246,7 @@ int main(void)
 // =========================================================================
 void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 {
-    // Очікуємо рівно 16 байт (повний зашифрований блок AES-128)
+    // Очікуємо рівно 16 байт (повний зашифрований блок AES-256)
     if (size == 16) 
     {
         memcpy(incoming_lora_payload, payload, 16);
@@ -368,7 +369,8 @@ static void MX_CRYP_Init(void)
 {
   hcryp.Instance = AES;
   hcryp.Init.DataType = CRYP_DATATYPE_32B;
-  hcryp.Init.KeySize = CRYP_KEYSIZE_128B;
+  // ЗМІНЕНО: Активовано стандарт Gaia 2.0 (256-бітне шифрування)
+  hcryp.Init.KeySize = CRYP_KEYSIZE_256B;
   hcryp.Init.pKey = aes_key;
   hcryp.Init.Algorithm = CRYP_AES_ECB; // Режим ECB достатній для одного 16-байтного блоку
   HAL_CRYP_Init(&hcryp);
