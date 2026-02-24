@@ -321,9 +321,11 @@ void Flush_Cache_To_Rails(void)
             binary_batch_buffer[offset++] = (uint8_t)(forest_cache[i].uid >> 16);
             binary_batch_buffer[offset++] = (uint8_t)(forest_cache[i].uid >> 8);
             binary_batch_buffer[offset++] = (uint8_t)(forest_cache[i].uid & 0xFF);
-            
-            // Копіюємо 1 байт RSSI
-            binary_batch_buffer[offset++] = (uint8_t)forest_cache[i].rssi;
+
+            // Копіюємо 1 байт RSSI. Інвертуємо знак (наприклад, -85 дБм стає 85).
+            // Це гарантує чисту передачу без проблем з Two's complement. 
+            // На сервері треба просто помножити це число на -1.
+            binary_batch_buffer[offset++] = (uint8_t)(-forest_cache[i].rssi);
             
             // Копіюємо 16 байтів розшифрованого фізичного Payload'у
             memcpy(&binary_batch_buffer[offset], forest_cache[i].payload, 16);
