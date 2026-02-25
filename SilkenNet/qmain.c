@@ -319,6 +319,7 @@ void Flush_Cache_To_Rails(void)
     // Пакуємо весь кеш у щільний бінарний масив (21 байт на запис)
     for(int i = 0; i < CACHE_MAX_ENTRIES; i++) {
         if(forest_cache[i].is_active) {
+            if ((offset + 21) > sizeof(binary_batch_buffer)) break;
             // Копіюємо 4 байти DID (великоендіанний формат мережі)
             binary_batch_buffer[offset++] = (uint8_t)(forest_cache[i].uid >> 24);
             binary_batch_buffer[offset++] = (uint8_t)(forest_cache[i].uid >> 16);
