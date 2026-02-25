@@ -90,7 +90,7 @@ uint8_t ota_buffer[1024];
 uint16_t ota_bytes_received = 0;
 uint8_t ota_total_chunks = 0;
 uint8_t ota_chunks_received = 0;
-// ДОДАНО: Масив прапорців для захисту від дублікатів OTA
+// Масив прапорців для захисту від дублікатів OTA
 uint8_t ota_chunk_received[256] = {0}; 
 
 uint8_t* current_lorenz_bytecode;
@@ -110,7 +110,7 @@ const uint8_t lorenz_bytecode[] = {
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_ADC_Init(void);
-static void MX_TIM2_Init(void); // Додано: Ініціалізація таймера для DMA
+static void MX_TIM2_Init(void); // Ініціалізація таймера для DMA
 static void MX_IWDG_Init(void); // Ініціалізація IWDG
 static void MX_RNG_Init(void);
 static void MX_RTC_Init(void);
@@ -238,6 +238,16 @@ int main(void)
   } else {
       current_lorenz_bytecode = (uint8_t*)lorenz_bytecode; 
   }
+
+  // =========================================================================
+  // ІНІЦІАЛІЗАЦІЯ RUBY (Запуск VM один раз на все життя)
+  // =========================================================================
+  // Це рятує нас від OOM (Out Of Memory) та фрагментації купи в циклі
+  mrb_state *mrb = mrb_open();
+  if (mrb) {
+      mrb_load_irep(mrb, current_lorenz_bytecode);
+  }
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -264,7 +274,7 @@ int main(void)
     uint16_t internal_temp = 0;
     uint16_t vcap_voltage = 0;
     
-    // ДОДАНО: Роздвоєння циклу Start/Stop для стабільної роботи АЦП
+    // Роздвоєння циклу Start/Stop для стабільної роботи АЦП (Анти-Дедлок)
     HAL_ADC_Start(&hadc); 
     if (HAL_ADC_PollForConversion(&hadc, 10) == HAL_OK) {
         internal_temp = HAL_ADC_GetValue(&hadc); // Канал температури
@@ -298,20 +308,15 @@ int main(void)
         // Поки CPU спить, DMA перекидає байти з АЦП у raw_audio_buffer без участі ядра.
         HAL_SuspendTick();
         while (!audio_ready) {
-            // Вимикаємо глобальні переривання, щоб уникнути Race Condition
-            __disable_irq(); 
-            
-            // Ще раз перевіряємо, чи не сталося переривання поки ми їх вимикали
+            __disable_irq(); // Вимикаємо глобальні переривання, щоб уникнути Race Condition
             if (!audio_ready) { 
-                // Засинаємо. Переривання DMA все одно розбудить процесор, 
-                // навіть якщо __disable_irq() активний (так працює WFI).
                 HAL_PWR_EnterSLEEPMode(PWR_MAINREGULATOR_ON, PWR_SLEEPENTRY_WFI);
             }
-            // Одразу після пробудження вмикаємо переривання назад, 
-            // щоб процесор зміг обробити Callback від DMA і змінити audio_ready.
-            __enable_irq(); 
+            __enable_irq(); // Вмикаємо переривання назад
         }
         HAL_ResumeTick();
+        
+        __DMB(); // Бар'єр пам'яті. Гарантуємо, що процесор бачить свіжі дані від DMA, а не старий кеш
 
         // --- ТУТ ПРОЦЕСОР ПРОКИНЕТЬСЯ, КОЛИ DMA ЗАПОВНИТЬ БУФЕР ---
 
@@ -375,11 +380,7 @@ int main(void)
     // ФАЗА 3: ПЛАВКА (Запуск Ruby та Атрактора Лоренца)
     // =========================================================================
     
-    mrb_state *mrb = mrb_open();
-
     if (mrb) {
-      mrb_load_irep(mrb, current_lorenz_bytecode);
-
       mrb_value args[3];
       args[0] = mrb_fixnum_value(chaos_seed);
       args[1] = mrb_fixnum_value((int8_t)lora_payload[6]); // Температура (Зимовий щит)
@@ -389,9 +390,8 @@ int main(void)
 
       // Байт 10: Біо-Контракт (Токеноміка)
       lora_payload[10] = (uint8_t)mrb_fixnum(ruby_result);
-      mrb_close(mrb);
     } else {
-      // Якщо VM не запустилася через нестачу пам'яті
+      // Якщо VM не запустилася при старті через нестачу пам'яті
       lora_payload[10] = 0xFF; 
     }
     
@@ -433,9 +433,11 @@ int main(void)
                     uint8_t chunk_idx = decrypted_rx_payload[1];
                     ota_total_chunks = decrypted_rx_payload[2];
                     uint8_t chunk_size = incoming_lora_size - 3; 
-                    uint16_t offset = chunk_idx * chunk_size;
                     
-                    // ДОДАНО: Броня пам'яті та захист від дублікатів
+                    // Явне приведення типів для розрахунку зміщення (MISRA C)
+                    uint16_t offset = (uint16_t)chunk_idx * (uint16_t)chunk_size;
+                    
+                    // Броня пам'яті та захист від дублікатів
                     if (!ota_chunk_received[chunk_idx] && (offset + chunk_size) <= sizeof(ota_buffer)) {
                         memcpy(&ota_buffer[offset], &decrypted_rx_payload[3], chunk_size);
                         ota_chunk_received[chunk_idx] = 1; // Маркуємо шматок як отриманий
@@ -459,9 +461,9 @@ int main(void)
                             ((uint32_t)decrypted_rx_payload[2] << 8)  | 
                             (uint32_t)decrypted_rx_payload[3];
 
-                        // ДОДАНО: Захист від власного відлуння (Ігноруємо свій голос)
+                        // Захист від власного відлуння (Ігноруємо свій голос)
                         if (incoming_did == tree_did) {
-                            continue; // Пропускаємо цей пакет, але продовжуємо слухати ефір
+                            break; // Миттєво припиняємо слухати ефір, йдемо спати
                         }
 
                         // Логіка Checkerboard (Захист від пінг-понгу)
