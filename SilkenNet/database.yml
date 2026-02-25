@@ -1,0 +1,3 @@
+production:
+  <<: *default
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 15 } %> # Має бути > 10
