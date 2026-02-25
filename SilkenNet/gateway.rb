@@ -3,10 +3,10 @@
 class Gateway < ApplicationRecord
   # Королева може належати до кластера (але може бути і тестовою, без лісу)
   belongs_to :cluster, optional: true
-  
   # Всі пакети, які пройшли через цю Королеву
   has_many :telemetry_logs, foreign_key: :queen_uid, primary_key: :uid, dependent: :nullify
-
+  has_many :maintenance_records, as: :maintainable
+  
   # uid - це унікальний ідентифікатор модему/мікроконтролера
   validates :uid, presence: true, uniqueness: true
 
