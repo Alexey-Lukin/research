@@ -7,6 +7,7 @@ class Tree < ApplicationRecord
   has_one :wallet, dependent: :destroy
   # Історія пульсу знищується (або можна залишити nullify для архіву)
   has_many :telemetry_logs, dependent: :destroy
+  has_one :device_calibration, dependent: :destroy
 
   # did - це 32-бітний хеш, згенерований в main.c з UID STM32 та шуму кристала
   validates :did, presence: true, uniqueness: true
