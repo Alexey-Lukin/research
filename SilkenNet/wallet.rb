@@ -3,21 +3,23 @@
 class Wallet < ApplicationRecord
   belongs_to :tree
   
-  # Історія виведення коштів на зовнішній блокчейн
   has_many :blockchain_transactions, dependent: :destroy
 
   validates :balance, presence: true, numericality: { greater_than_or_equal_to: 0 }
+  
+  # [НОВЕ] Перевірка формату крипто-гаманця (наприклад, для EVM-сумісних мереж типу Polygon)
+  # Якщо адреса вказана, вона має починатися з '0x' і мати довжину 42 символи
+  validates :crypto_public_address, format: { with: /\A0x[a-fA-F0-9]{40}\z/ }, allow_blank: true
 
-  # Безпечне нарахування токенів. 
-  # Використовуємо атомарний SQL-запит (UPDATE wallets SET balance = balance + X) 
-  # для уникнення стану гонки (Race Condition), якщо дані прийдуть одночасно.
+  # Безпечне нарахування токенів
   def credit!(points)
     increment!(:balance, points)
   end
 
-  # Підготовка до мінтингу на блокчейні.
-  # Блокуємо рядок у базі (Pessimistic Locking), списуємо баланс і створюємо транзакцію.
   def lock_and_mint!(amount, type = :carbon_coin)
+    # [НОВЕ] Блокуємо мінтинг, якщо не вказано адресу для виводу
+    raise ActiveRecord::RecordInvalid, "Не вказано крипто-адресу (crypto_public_address)" if crypto_public_address.blank?
+
     transaction do
       lock!
       raise ActiveRecord::RecordInvalid, "Недостатньо балів на балансі" if balance < amount
