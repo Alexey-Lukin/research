@@ -1,0 +1,4 @@
+:concurrency: 10
+:queues:
+  - default
+  - telemetry # Наша швидкісна магістраль
