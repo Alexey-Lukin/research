@@ -2,10 +2,9 @@
 
 class Tree < ApplicationRecord
   belongs_to :cluster, optional: true
-  
+  belongs_to :tree_species
   # Гаманець знищується разом з деревом, якщо воно вмирає/спилюється
   has_one :wallet, dependent: :destroy
-  
   # Історія пульсу знищується (або можна залишити nullify для архіву)
   has_many :telemetry_logs, dependent: :destroy
 
