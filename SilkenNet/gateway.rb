@@ -1,21 +1,32 @@
 # frozen_string_literal: true
 
 class Gateway < ApplicationRecord
-  # Королева може належати до кластера (але може бути і тестовою, без лісу)
   belongs_to :cluster, optional: true
-  # Всі пакети, які пройшли через цю Королеву
-  has_many :telemetry_logs, foreign_key: :queen_uid, primary_key: :uid, dependent: :nullify
-  has_many :maintenance_records, as: :maintainable
   
-  # uid - це унікальний ідентифікатор модему/мікроконтролера
+  # Пакети від дерев, що пройшли через цю Королеву
+  has_many :telemetry_logs, foreign_key: :queen_uid, primary_key: :uid, dependent: :nullify
+  
+  # [НОВЕ] Власні життєві показники Королеви (батарея, зв'язок)
+  has_many :gateway_telemetry_logs, foreign_key: :queen_uid, primary_key: :uid, dependent: :destroy
+
+  # [НОВЕ] Журнал фізичного обслуговування (хто і коли чистив сонячну панель)
+  has_many :maintenance_records, as: :maintainable, dependent: :destroy
+
   validates :uid, presence: true, uniqueness: true
 
-  # СКОУПИ для дашборду
+  # [НОВЕ] Валідації для управління стільниковою мережею та сном
+  # phone_number та sim_iccid можуть бути порожніми до моменту встановлення SIM-карти
+  validates :config_sleep_interval_s, presence: true, numericality: { greater_than_or_equal_to: 60 }
+
   scope :online, -> { where('last_seen_at >= ?', 1.hour.ago) }
   scope :offline, -> { where('last_seen_at < ? OR last_seen_at IS NULL', 1.hour.ago) }
 
-  # Метод для оновлення пульсу Королеви
   def mark_seen!
     touch(:last_seen_at)
+  end
+
+  # [НОВЕ] Метод для розрахунку наступного пробудження Королеви
+  def next_wakeup_expected_at
+    last_seen_at ? last_seen_at + config_sleep_interval_s.seconds : nil
   end
 end
