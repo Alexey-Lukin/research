@@ -1,59 +1,48 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# 1. Завантажуємо все середовище Rails 8 (Моделі, Сервіси, Базу Даних)
 require_relative '../config/environment'
 require 'socket'
+require 'base64'
 
-PORT = 5683 # Стандартний порт CoAP
-MAX_PACKET_SIZE = 2048 # Наш буфер з qmain.c має розмір 2048 байт
+PORT = 5683
+MAX_PACKET_SIZE = 2048
 
-# 2. Відкриваємо UDP сокет
 socket = UDPSocket.new
 socket.bind('0.0.0.0', PORT)
 
-Rails.logger.info "🌳 [Silken Net] CoAP Слухач запущено на UDP порту #{PORT}..."
+Rails.logger.info "🌳 [Sanctum] UDP/CoAP Слухач запущено на порту #{PORT}. Тертя відсутнє."
 
-# 3. Нескінченний цикл слухання ефіру
 loop do
   begin
-    # Блокується, поки не прилетить пакет від модему Королеви
+    # 1. Ловимо пакет (блокується до появи даних)
     data, sender = socket.recvfrom(MAX_PACKET_SIZE)
-    sender_ip = sender[3]
-    sender_port = sender[1]
-
-    # --- МІКРО-ПАРСЕР CoAP ---
-    # CoAP заголовок: [Version+Type+TKL (1 байт)] [Code (1 байт)] [MessageID (2 байти)]
+    
+    # 2. Мікро-парсер CoAP
     header = data.unpack('CCn')
-    type_and_tkl = header[0]
-    type = (type_and_tkl >> 4) & 0x03 # Витягуємо тип повідомлення
-    msg_id = header[2]
-
-    # Якщо тип = 0 (Confirmable / Потребує підтвердження)
+    type = (header[0] >> 4) & 0x03
+    
+    # 3. Миттєвий ACK (якщо пакет Confirmable)
     if type == 0
-      # Формуємо ACK (Підтвердження), щоб модем SIM7070G заспокоївся і заснув
-      # 0x60 = Version 1, Type ACK (2), TKL 0
-      # 0x44 = Code 2.04 (Changed - успішно оброблено)
-      ack_packet = [0x60, 0x44, msg_id].pack('CCn')
-      socket.send(ack_packet, 0, sender_ip, sender_port)
+      ack_packet = [0x60, 0x44, header[2]].pack('CCn')
+      socket.send(ack_packet, 0, sender[3], sender[1])
     end
 
-    # --- ВИТЯГУВАННЯ БІНАРНОГО ХАОСУ ---
-    # Згідно зі стандартом CoAP, корисне навантаження (payload) починається після маркера 0xFF
+    # 4. Витягування корисного навантаження
     payload_marker_index = data.index("\xFF".b)
-    
     if payload_marker_index
       binary_payload = data[(payload_marker_index + 1)..-1]
       
-      Rails.logger.info "📡 Отримано батч від Королеви (#{sender_ip}): #{binary_payload.bytesize} байт"
+      # 5. MAX SPEED: Кодуємо бінарник у текст і кидаємо в Redis (Sidekiq)
+      # strict_encode64 не додає символів переносу рядка (\n), що робить його ще швидшим
+      encoded_payload = Base64.strict_encode64(binary_payload)
       
-      # 4. ПЕРЕДАЧА В РЕЙЛС (Тут ми будемо розбирати наші 21-байтні шматки)
-      # TelemetryUnpackerService.call(binary_payload)
-    else
-      Rails.logger.warn "⚠️ Отримано CoAP пакет без корисного навантаження"
+      # Миттєвий запис в оперативну пам'ять (O(1))
+      UnpackTelemetryWorker.perform_async(encoded_payload, sender[3])
     end
 
   rescue StandardError => e
-    Rails.logger.error "🛑 Помилка UDP Слухача: #{e.message}"
+    # Єдиний лог, який нам потрібен — це лог фатальної помилки
+    Rails.logger.error "🛑 Crash: #{e.message}"
   end
 end
