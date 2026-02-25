@@ -17,19 +17,21 @@ class Wallet < ApplicationRecord
   end
 
   def lock_and_mint!(amount, type = :carbon_coin)
-    # [НОВЕ] Блокуємо мінтинг, якщо не вказано адресу для виводу
-    raise ActiveRecord::RecordInvalid, "Не вказано крипто-адресу (crypto_public_address)" if crypto_public_address.blank?
+    raise ActiveRecord::RecordInvalid, "Не вказано адресу" if crypto_public_address.blank?
 
     transaction do
       lock!
-      raise ActiveRecord::RecordInvalid, "Недостатньо балів на балансі" if balance < amount
-      
+      raise ActiveRecord::RecordInvalid, "Недостатньо балів" if balance < amount
+    
       decrement!(:balance, amount)
-      blockchain_transactions.create!(
+      tx = blockchain_transactions.create!(
         amount: amount, 
         token_type: type, 
         status: :pending
       )
+    
+      # Вистрілюємо задачу в Redis. Миттєво.
+      MintCarbonCoinWorker.perform_async(tx.id)
     end
   end
 end
