@@ -1,0 +1,59 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# 1. Завантажуємо все середовище Rails 8 (Моделі, Сервіси, Базу Даних)
+require_relative '../config/environment'
+require 'socket'
+
+PORT = 5683 # Стандартний порт CoAP
+MAX_PACKET_SIZE = 2048 # Наш буфер з qmain.c має розмір 2048 байт
+
+# 2. Відкриваємо UDP сокет
+socket = UDPSocket.new
+socket.bind('0.0.0.0', PORT)
+
+Rails.logger.info "🌳 [Silken Net] CoAP Слухач запущено на UDP порту #{PORT}..."
+
+# 3. Нескінченний цикл слухання ефіру
+loop do
+  begin
+    # Блокується, поки не прилетить пакет від модему Королеви
+    data, sender = socket.recvfrom(MAX_PACKET_SIZE)
+    sender_ip = sender[3]
+    sender_port = sender[1]
+
+    # --- МІКРО-ПАРСЕР CoAP ---
+    # CoAP заголовок: [Version+Type+TKL (1 байт)] [Code (1 байт)] [MessageID (2 байти)]
+    header = data.unpack('CCn')
+    type_and_tkl = header[0]
+    type = (type_and_tkl >> 4) & 0x03 # Витягуємо тип повідомлення
+    msg_id = header[2]
+
+    # Якщо тип = 0 (Confirmable / Потребує підтвердження)
+    if type == 0
+      # Формуємо ACK (Підтвердження), щоб модем SIM7070G заспокоївся і заснув
+      # 0x60 = Version 1, Type ACK (2), TKL 0
+      # 0x44 = Code 2.04 (Changed - успішно оброблено)
+      ack_packet = [0x60, 0x44, msg_id].pack('CCn')
+      socket.send(ack_packet, 0, sender_ip, sender_port)
+    end
+
+    # --- ВИТЯГУВАННЯ БІНАРНОГО ХАОСУ ---
+    # Згідно зі стандартом CoAP, корисне навантаження (payload) починається після маркера 0xFF
+    payload_marker_index = data.index("\xFF".b)
+    
+    if payload_marker_index
+      binary_payload = data[(payload_marker_index + 1)..-1]
+      
+      Rails.logger.info "📡 Отримано батч від Королеви (#{sender_ip}): #{binary_payload.bytesize} байт"
+      
+      # 4. ПЕРЕДАЧА В РЕЙЛС (Тут ми будемо розбирати наші 21-байтні шматки)
+      # TelemetryUnpackerService.call(binary_payload)
+    else
+      Rails.logger.warn "⚠️ Отримано CoAP пакет без корисного навантаження"
+    end
+
+  rescue StandardError => e
+    Rails.logger.error "🛑 Помилка UDP Слухача: #{e.message}"
+  end
+end
