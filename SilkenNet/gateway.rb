@@ -11,6 +11,7 @@ class Gateway < ApplicationRecord
 
   # Журнал фізичного обслуговування (хто і коли чистив сонячну панель)
   has_many :maintenance_records, as: :maintainable, dependent: :destroy
+  has_many :actuators, dependent: :destroy
 
   validates :uid, presence: true, uniqueness: true
 
