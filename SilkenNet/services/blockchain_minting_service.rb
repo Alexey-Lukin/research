@@ -3,9 +3,10 @@
 require 'eth'
 
 class BlockchainMintingService
-  # Нам не потрібен повний ABI контракту, достатньо лише функції mint, 
-  # щоб Rails знав, як правильно закодувати параметри (ABI Encoding).
-  CONTRACT_ABI = '[{"inputs":[{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"string","name":"treeDid","type":"string"}],"name":"mint","outputs":[],"stateMutability":"nonpayable","type":"function"}]'
+  # Універсальний ABI для обох контрактів.
+  # Оскільки обидві функції mint() приймають (address, uint256, string),
+  # ми можемо використовувати один ABI, назвавши третій параметр просто "identifier".
+  CONTRACT_ABI = '[{"inputs":[{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"string","name":"identifier","type":"string"}],"name":"mint","outputs":[],"stateMutability":"nonpayable","type":"function"}]'
 
   def self.call(blockchain_transaction_id)
     new(blockchain_transaction_id).call
@@ -15,7 +16,7 @@ class BlockchainMintingService
     @transaction = BlockchainTransaction.find(blockchain_transaction_id)
     @wallet = @transaction.wallet
     
-    # Знаходимо дерево (Солдата), чиї зусилля ми зараз токенізуємо
+    # Знаходимо дерево (Солдата), з гаманця якого ініційовано мінтинг
     @tree = @wallet.tree 
   end
 
@@ -23,56 +24,56 @@ class BlockchainMintingService
     # Захист від подвійного мінтингу
     return unless @transaction.status_pending?
 
-    # 1. Підключення до ноди (Polygon Mainnet або Amoy Testnet через Alchemy)
-    # Alchemy забезпечує стабільний RPC-зв'язок без підняття власної ноди
+    # 1. Підключення до ноди (через Alchemy) та ініціалізація Оракула
     client = Eth::Client.create(ENV.fetch('ALCHEMY_POLYGON_RPC_URL'))
-    
-    # 2. Відновлення гаманця Оракула з приватного ключа сервера
-    # УВАГА: Цей ключ має бути лише в ENV-змінних або у Vault, ніколи в коді!
     oracle_key = Eth::Key.new(priv: ENV.fetch('ORACLE_PRIVATE_KEY'))
     
-    # 3. Ініціалізація контракту
-    contract_address = ENV.fetch('CARBON_COIN_CONTRACT_ADDRESS')
-    contract = Eth::Contract.from_abi(name: "SilkenCarbonCoin", address: contract_address, abi: CONTRACT_ABI)
+    # 2. МАРШРУТИЗАТОР ТОКЕНІВ (Dual-Token Economy)
+    # Визначаємо адресу контракту та ідентифікатор для публічного аудиту
+    if @transaction.token_type == 'carbon_coin'
+      contract_address = ENV.fetch('CARBON_COIN_CONTRACT_ADDRESS')
+      identifier = @tree.did # Для вуглецю звітуємо за кожне дерево окремо
+    elsif @transaction.token_type == 'forest_coin'
+      contract_address = ENV.fetch('FOREST_COIN_CONTRACT_ADDRESS')
+      identifier = "CLUSTER_#{@tree.cluster.id}" # Для біорізноманіття звітуємо за ліс
+    else
+      raise ArgumentError, "Невідомий тип токена: #{@transaction.token_type}"
+    end
 
-    # 4. Підготовка даних
-    # У блокчейні немає дробів. 1 токен = 1 * 10^18 wei.
+    contract = Eth::Contract.from_abi(name: "SilkenCoin", address: contract_address, abi: CONTRACT_ABI)
+
+    # 3. Підготовка даних (1 токен = 1 * 10^18 wei)
     amount_in_wei = @transaction.amount * (10**18)
     investor_address = @wallet.crypto_public_address
-    tree_did = @tree.did
 
     begin
-      Rails.logger.info "⏳ [Web3] Ініціація мінтингу #{@transaction.amount} SCC для дерева #{tree_did}..."
+      Rails.logger.info "⏳ [Web3] Ініціація мінтингу #{@transaction.amount} #{@transaction.token_type.upcase} для #{identifier}..."
 
-      # 5. Магія: формування, підпис (ECDSA) та відправка транзакції
-      # transact_and_wait блокує потік, поки нода не підтвердить, що транзакція включена в блок
+      # 4. Формування, підпис (ECDSA) та відправка транзакції
       tx_hash = client.transact_and_wait(
         contract, 
         "mint", 
         investor_address, 
         amount_in_wei, 
-        tree_did, 
+        identifier, 
         sender_key: oracle_key
       )
       
-      # 6. Успіх: записуємо хеш назавжди
-      @transaction.confirm_minting!(tx_hash)
+      # 5. Успіх: записуємо хеш назавжди
+      @transaction.update!(status: :confirmed, tx_hash: tx_hash)
       Rails.logger.info "✅ [Web3] Успішний мінтинг! Хеш: #{tx_hash}"
 
     rescue StandardError => e
-      # 7. Обробка аварій (Немає грошей на газ, Alchemy впав, RPC відхилив)
+      # 6. Обробка аварій (Немає грошей на газ, Alchemy впав, RPC відхилив)
       Rails.logger.error "🛑 [Web3] Помилка мінтингу: #{e.message}. Виконуємо Rollback."
       
       ActiveRecord::Base.transaction do
-        # Позначаємо транзакцію як провальну
         @transaction.update!(status: :failed)
         
-        # Повертаємо чесно зароблені бали назад на баланс дерева, 
-        # щоб наступна спроба (наприклад, завтра) їх забрала
+        # Повертаємо чесно зароблені бали назад на баланс дерева
         @wallet.increment!(:balance, @transaction.amount)
       end
       
-      # Прокидаємо помилку вище (щоб Sidekiq знав, що задача впала, або Sentry зловив алерт)
       raise e
     end
   end
