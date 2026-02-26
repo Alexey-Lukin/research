@@ -22,9 +22,18 @@ class Tree < ApplicationRecord
 
   # Автоматично створюємо гаманець при реєстрації нового дерева
   after_create :build_default_wallet
+  # Геопросторовий блок (для DSM та 3D-радіотрас)
+  validates :latitude, numericality: { greater_than_or_equal_to: -90, less_than_or_equal_to: 90 }, allow_nil: true
+  validates :longitude, numericality: { greater_than_or_equal_to: -180, less_than_or_equal_to: 180 }, allow_nil: true
+  validates :altitude, numericality: true, allow_nil: true
 
   private
 
+  # Допоміжний метод перевірки, чи пристрій має фізичну прив'язку на карті
+  def geolocated?
+    latitude.present? && longitude.present?
+  end
+  
   def build_default_wallet
     create_wallet!(balance: 0)
   end
